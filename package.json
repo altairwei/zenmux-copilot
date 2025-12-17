@@ -1,0 +1,154 @@
+{
+	"name": "zenmux-copilot",
+	"publisher": "zenmux",
+	"displayName": "ZenMux Compatible Provider for Copilot",
+	"description": "An extension that ZenMux API Providers into GitHub Copilot Chat",
+	"icon": "assets/logo.png",
+	"keywords": [
+		"ai",
+		"chat",
+		"copilot",
+		"github-copilot",
+		"language-model",
+		"openai",
+		"zenmux",
+		"anthropic",
+		"claude"
+	],
+	"repository": {
+		"type": "git",
+		"url": "git@github.com:ilimei/zenmux-copilot.git"
+	},
+	"version": "0.1.0",
+	"engines": {
+		"vscode": "^1.104.0"
+	},
+	"extensionDependencies": [
+		"github.copilot-chat"
+	],
+	"categories": [
+		"AI",
+		"Chat"
+	],
+	"badges": [
+		{
+			"url": "https://img.shields.io/github/stars/ilimei/zenmux-copilot?style=social",
+			"description": "Star zenmux-copilot on Github",
+			"href": "https://github.com/ilimei/zenmux-copilot"
+		}
+	],
+	"bugs": {
+		"url": "https://github.com/ilimei/zenmux-copilot/issues"
+	},
+	"license": "MIT",
+	"enabledApiProposals": [
+		"chatProvider",
+		"languageModelThinkingPart"
+	],
+	"activationEvents": [
+		"onStartupFinished",
+		"onCommand:zenmux.setApikey"
+	],
+	"contributes": {
+		"languageModelChatProviders": [
+			{
+				"vendor": "zenmux",
+				"displayName": "ZenMux Provider",
+				"managementCommand": "zenmux.setApikey"
+			}
+		],
+		"commands": [
+			{
+				"command": "zenmux.setApikey",
+				"title": "ZenMux: Set ZenMux Apikey"
+			}
+		],
+		"configuration": {
+			"title": "ZenMux Compatible Copilot",
+			"properties": {
+				"zenmux.baseUrl": {
+					"type": "string",
+					"default": "https://zenmux.ai/api/v1",
+					"description": "The base URL for the ZenMux Compatible Inference API. Default value is Hugging Face."
+				},
+				"zenmux.anthropic.baseUrl": {
+					"type": "string",
+					"default": "https://zenmux.ai/api/anthropic",
+					"description": "The base URL for the Anthropic Compatible Inference API. Default value is Anthropic official API."
+				},
+				"zenmux.vertex.baseUrl": {
+					"type": "string",
+					"default": "https://zenmux.ai/api/vertex-ai",
+					"description": "The base URL for the Vertex AI Compatible Inference API. Default value is Google Vertex AI official API."
+				},
+				"zenmux.retry": {
+					"type": "object",
+					"default": {
+						"enabled": true,
+						"max_attempts": 3,
+						"interval_ms": 1000
+					},
+					"properties": {
+						"enabled": {
+							"type": "boolean",
+							"default": true,
+							"description": "Enable retry mechanism for api errors. Default is true."
+						},
+						"max_attempts": {
+							"type": "number",
+							"default": 3,
+							"minimum": 1,
+							"description": "Maximum number of retry attempts. Default is 3."
+						},
+						"interval_ms": {
+							"type": "number",
+							"default": 1000,
+							"minimum": 1,
+							"description": "Interval between retry attempts in milliseconds. Default is 1000 (1 seconds)."
+						},
+						"status_codes": {
+							"type": "array",
+							"items": {
+								"type": "number"
+							},
+							"description": "Additional HTTP status codes that will be merged. Default is [429, 500, 502, 503, 504]."
+						}
+					},
+					"description": "Retry configuration for handling api errors like [429, 500, 502, 503, 504]."
+				},
+				"zenmux.delay": {
+					"type": "number",
+					"default": 0,
+					"minimum": 0,
+					"description": "Fixed delay in milliseconds between consecutive requests. Default is 0 (no delay)."
+				}
+			}
+		}
+	},
+	"main": "./out/extension.js",
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"download-api": "dts dev && mv vscode.proposed.*.ts src",
+		"compile": "tsc -p ./",
+		"lint": "eslint",
+		"format": "prettier --write .",
+		"watch": "tsc -watch -p ./",
+		"test": "npm run compile && vscode-test",
+		"build": "npx @vscode/vsce package -o extension.vsix"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.13.0",
+		"@stylistic/eslint-plugin": "^2.9.0",
+		"@types/mocha": "^10.0.6",
+		"@types/node": "^22",
+		"@types/vscode": "^1.100.0",
+		"@vscode/dts": "^0.4.1",
+		"@vscode/test-cli": "^0.0.11",
+		"@vscode/test-electron": "^2.5.2",
+		"@vscode/vsce": "^3.7.1",
+		"eslint": "^9.13.0",
+		"prettier": "^3.1.0",
+		"typescript": "^5.9.2",
+		"typescript-eslint": "^8.39.0"
+	}
+}
