@@ -101,6 +101,41 @@ export interface HFExtraModelInfo {
 	pipeline_tag?: string;
 }
 
+export interface ZenMuxModelInfo {
+	all_tokens: number;
+	author: string;
+	context_length: number;
+	description: string;
+	display_endpoint_id: string;
+	endpoint_slug: string;
+	id: string;
+	input_modalities: string;
+	latency: number | null;
+	max_completion_tokens: number;
+	model_endpoint_visible: number;
+	model_visible: number;
+	name: string;
+	output_modalities: string;
+	pricing_completion: string;
+	pricing_prompt: string;
+	publish_time: string;
+	slug: string;
+	suitable_api: string;
+	supported_parameters: string;
+	supports_reasoning: number;
+	throughput: number | null;
+	token_week: number;
+	iconUrl: string;
+	isFree: boolean;
+	providerIcons: string[];
+	uptimeHh: Record<string, number>;
+}
+
+export interface ZenMuxModelResponse {
+	success: boolean;
+	data: ZenMuxModelInfo[];
+}
+
 /**
  * Response envelope for the router models listing.
  */

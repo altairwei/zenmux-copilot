@@ -1,7 +1,7 @@
 {
 	"name": "zenmux-copilot",
-	"publisher": "zenmux",
-	"displayName": "ZenMux Compatible Provider for Copilot",
+	"publisher": "hugehardzhang",
+	"displayName": "ZenMux Provider for Copilot",
 	"description": "An extension that ZenMux API Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
 	"keywords": [
@@ -19,7 +19,7 @@
 		"type": "git",
 		"url": "git@github.com:ilimei/zenmux-copilot.git"
 	},
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -53,7 +53,7 @@
 		"languageModelChatProviders": [
 			{
 				"vendor": "zenmux",
-				"displayName": "ZenMux Provider",
+				"displayName": "ZenMux",
 				"managementCommand": "zenmux.setApikey"
 			}
 		],

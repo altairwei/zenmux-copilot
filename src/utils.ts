@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { HFModelItem, HFModelsResponse, RetryConfig } from "./types";
+import { RetryConfig, ZenMuxModelInfo, ZenMuxModelResponse } from "./types";
 import { OpenAIFunctionToolDef } from "./openai/openaiTypes";
 
 /**
@@ -31,16 +31,16 @@ export async function ensureApiKey(silent: boolean, secrets: vscode.SecretStorag
  * Fetch the list of models and supplementary metadata from Hugging Face.
  * @param apiKey The HF API key used to authenticate.
  */
-export async function fetchModels(apiKey: string, userAgent: string): Promise<{ models: HFModelItem[] }> {
+export async function fetchModels(apiKey: string, userAgent: string): Promise<{ models: ZenMuxModelInfo[] }> {
 	const config = vscode.workspace.getConfiguration();
 	const BASE_URL = config.get<string>("zenmux.baseUrl", "");
 	if (!BASE_URL || !BASE_URL.startsWith("http")) {
 		throw new Error(`Invalid base URL configuration.`);
 	}
 	const modelsList = (async () => {
-		const resp = await fetch(`${BASE_URL.replace(/\/+$/, "")}/models`, {
+		const resp = await fetch(`https://zenmux.ai/api/frontend/model/listByFilter`, {
 			method: "GET",
-			headers: { Authorization: `Bearer ${apiKey}`, "User-Agent": userAgent },
+			headers: { "User-Agent": userAgent },
 		});
 		if (!resp.ok) {
 			let text = "";
@@ -55,7 +55,7 @@ export async function fetchModels(apiKey: string, userAgent: string): Promise<{ 
 			console.error("[OAI Compatible Model Provider] Failed to fetch OAI Compatible models", err);
 			throw err;
 		}
-		const parsed = (await resp.json()) as HFModelsResponse;
+		const parsed = (await resp.json()) as ZenMuxModelResponse;
 		return parsed.data ?? [];
 	})();
 

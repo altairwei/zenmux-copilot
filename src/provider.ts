@@ -14,6 +14,7 @@ import { AnthropicApi } from "./anthropic/anthropicApi";
 import { AnthropicRequestBody } from "./anthropic/anthropicTypes";
 import { prepareTokenCount } from "./provideToken";
 import { updateContextStatusBar } from "./statusBar";
+import { OpenaiApi } from "./openai/openaiApi";
 
 
 const DEFAULT_CONTEXT_LENGTH = 128000;
@@ -54,56 +55,31 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
       }
     }
     const { models } = await fetchModels(apiKey, this.userAgent);
-    return models.flatMap((m) => {
-      const providers = m?.providers ?? [];
-      const modalities = m.architecture?.input_modalities ?? [];
-      const vision = Array.isArray(modalities) && modalities.includes("image");
-
-      // Build entries for all providers that support tool calling
-      const toolProviders = providers.filter((p) => p.supports_tools === true);
-      const entries: LanguageModelChatInformation[] = [];
-
-      for (const p of toolProviders) {
-        const contextLen = p?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-        const maxOutput = DEFAULT_MAX_TOKENS;
-        const maxInput = Math.max(1, contextLen - maxOutput);
-        entries.push({
-          id: `${m.id}:${p.provider}`,
-          name: `${m.id} via ${p.provider}`,
-          tooltip: `ZenMux ${p.provider}`,
-          family: m.family ?? "zenmux",
-          version: "1.0.0",
-          maxInputTokens: maxInput,
-          maxOutputTokens: maxOutput,
-          capabilities: {
-            toolCalling: true,
-            imageInput: vision,
-          },
-        } satisfies LanguageModelChatInformation);
-      }
-
-      if (entries.length === 0) {
-        const base = providers.length > 0 ? providers[0] : null;
-        const contextLen = base?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-        const maxOutput = DEFAULT_MAX_TOKENS;
-        const maxInput = Math.max(1, contextLen - maxOutput);
-        entries.push({
-          id: `${m.id}`,
-          name: `${m.id} via ZenMux`,
-          tooltip: "ZenMux",
-          family: m.family ?? "zenmux",
-          version: "1.0.0",
-          maxInputTokens: maxInput,
-          maxOutputTokens: maxOutput,
-          capabilities: {
-            toolCalling: true,
-            imageInput: true,
-          },
-        } satisfies LanguageModelChatInformation);
-      }
-
-      return entries;
+    return models.map(m => {
+      const maxInput = Math.max(1, m.context_length - m.max_completion_tokens || DEFAULT_MAX_TOKENS);
+      return {
+        id: `${m.slug}`,
+        name: m.name + ' via ZenMux',
+        tooltip: 'ZenMux Model ' + (m.name || ''),
+        detail: m.suitable_api + '-' + m.supports_reasoning,
+        family: 'zenmux',
+        version: m.publish_time || '1.0.0',
+        maxInputTokens: maxInput,
+        maxOutputTokens: m.max_completion_tokens || DEFAULT_MAX_TOKENS,
+        capabilities: {
+          toolCalling: m.supported_parameters?.includes('tools') || false,
+          imageInput: m.input_modalities?.includes('image') || false,
+        },
+      } as LanguageModelChatInformation;
     });
+  }
+
+  private isSupportMessage(model: vscode.LanguageModelChatInformation): boolean {
+    return model.detail?.includes('messages') || false;
+  }
+
+  private isSupportReasoning(model: vscode.LanguageModelChatInformation): boolean {
+    return model.detail?.endsWith('-1') || false;
   }
 
   async provideLanguageModelChatResponse(
@@ -112,6 +88,7 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
     options: ProvideLanguageModelChatResponseOptions,
     progress: Progress<vscode.LanguageModelResponsePart>,
     token: CancellationToken) {
+    console.info(model.detail);
     // Update Token Usage
     updateContextStatusBar(messages, model, this.statusBarItem);
 
@@ -151,51 +128,99 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
       }
       // get model config from user settings
       const config = vscode.workspace.getConfiguration();
-      const BASE_URL = config.get<string>("zenmux.anthropic.baseUrl", "https://zenmux.ai/api/anthropic");
-      // Anthropic API mode
-      const anthropicApi = new AnthropicApi();
-      const anthropicMessages = anthropicApi.convertMessages(messages, {
-        includeReasoningInRequest: true,
-      });
-
-      // requestBody
-      let requestBody: AnthropicRequestBody = {
-        model: model.id,
-        messages: anthropicMessages,
-        stream: true,
-      };
-      // requestBody = anthropicApi.prepareRequestBody(requestBody, model, options);
-      // console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
-
-      // send Anthropic chat request with retry
-      const response = await executeWithRetry(async () => {
-        const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/v1/messages`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "User-Agent": this.userAgent,
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify(requestBody),
+      if (this.isSupportMessage(model)) {
+        const BASE_URL = config.get<string>("zenmux.anthropic.baseUrl", "https://zenmux.ai/api/anthropic");
+        // Anthropic API mode
+        const anthropicApi = new AnthropicApi();
+        const anthropicMessages = anthropicApi.convertMessages(messages, {
+          includeReasoningInRequest: false,
         });
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          const msg = `[Anthropic Provider] Anthropic API error response status=${res.status} statusText=${res.statusText} body=${errorText}`;
-          try { this.output.appendLine(msg); } catch { console.error(msg); }
-          throw new Error(
-            `Anthropic API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
-          );
+        // requestBody
+        let requestBody: AnthropicRequestBody = {
+          model: model.id,
+          messages: anthropicMessages,
+          stream: true,
+          max_tokens: model.maxOutputTokens || DEFAULT_MAX_TOKENS,
+        };
+        // requestBody = anthropicApi.prepareRequestBody(requestBody, model, options);
+        // console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
+
+        // send Anthropic chat request with retry
+        const response = await executeWithRetry(async () => {
+          const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/v1/messages`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent": this.userAgent,
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          if (!res.ok) {
+            const errorText = await res.text();
+            const msg = `[Anthropic Provider] Anthropic API error response status=${res.status} statusText=${res.statusText} body=${errorText}`;
+            try { this.output.appendLine(msg); } catch { console.error(msg); }
+            throw new Error(
+              `Anthropic API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+            );
+          }
+
+          return res;
+        }, createRetryConfig());
+
+        if (!response.body) {
+          throw new Error("No response body from Anthropic API");
         }
+        await anthropicApi.processStreamingResponse(response.body, trackingProgress, token);
+      } else {
+        const BASE_URL = config.get<string>("zenmux.baseUrl", "https://zenmux.ai/api/v1");
+        // OpenAI compatible API mode (default)
+        const openaiApi = new OpenaiApi();
+        const openaiMessages = openaiApi.convertMessages(messages, {
+          includeReasoningInRequest: false,
+        });
 
-        return res;
-      }, createRetryConfig());
+        // requestBody
+        let requestBody: Record<string, unknown> = {
+          model: model.id,
+          messages: openaiMessages,
+          stream: true,
+          stream_options: { include_usage: true },
+        };
+        // requestBody = openaiApi.prepareRequestBody(requestBody, model, options);
+        // console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
 
-      if (!response.body) {
-        throw new Error("No response body from Anthropic API");
+        // send chat request with retry
+        const response = await executeWithRetry(async () => {
+          const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent": this.userAgent,
+              "Authorization": `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          if (!res.ok) {
+            const errorText = await res.text();
+            console.error("[OAI Compatible Model Provider] OAI Compatible API error response", errorText);
+            throw new Error(
+              `OAI Compatible API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+            );
+          }
+
+          return res;
+        }, createRetryConfig());
+
+        if (!response.body) {
+          throw new Error("No response body from OAI Compatible API");
+        }
+        await openaiApi.processStreamingResponse(response.body, trackingProgress, token);
       }
-      await anthropicApi.processStreamingResponse(response.body, trackingProgress, token);
     } catch (err) {
       console.error("[ZenMux Model Provider] Chat request failed", {
         modelId: model.id,
