@@ -88,7 +88,6 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
     options: ProvideLanguageModelChatResponseOptions,
     progress: Progress<vscode.LanguageModelResponsePart>,
     token: CancellationToken) {
-    console.info(model.detail);
     // Update Token Usage
     updateContextStatusBar(messages, model, this.statusBarItem);
 
