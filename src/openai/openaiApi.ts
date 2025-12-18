@@ -141,51 +141,52 @@ export class OpenaiApi extends CommonApi {
 	}
 
 	prepareRequestBody(
-		rb: Record<string, unknown>,
+		rb: any,
 		um: HFModelItem | undefined,
 		options: ProvideLanguageModelChatResponseOptions
-	): Record<string, unknown> {
+	): any {
+		const orb = rb as Record<string, unknown>;
 		// temperature
 		const oTemperature = options.modelOptions?.temperature ?? 0;
 		const temperature = um?.temperature ?? oTemperature;
-		rb.temperature = temperature;
+		orb.temperature = temperature;
 		if (um && um.temperature === null) {
-			delete rb.temperature;
+			delete orb.temperature;
 		}
 
 		// top_p
 		if (um?.top_p !== undefined && um.top_p !== null) {
-			rb.top_p = um.top_p;
+			orb.top_p = um.top_p;
 		}
 
 		// max_tokens
 		if (um?.max_tokens !== undefined) {
-			rb.max_tokens = um.max_tokens;
+			orb.max_tokens = um.max_tokens;
 		}
 
 		// max_completion_tokens (OpenAI new standard parameter)
 		if (um?.max_completion_tokens !== undefined) {
-			rb.max_completion_tokens = um.max_completion_tokens;
+			orb.max_completion_tokens = um.max_completion_tokens;
 		}
 
 		// OpenAI reasoning configuration
 		if (um?.reasoning_effort !== undefined) {
-			rb.reasoning_effort = um.reasoning_effort;
+			orb.reasoning_effort = um.reasoning_effort;
 		}
 
 		// enable_thinking (non-OpenRouter only)
 		const enableThinking = um?.enable_thinking;
 		if (enableThinking !== undefined) {
-			rb.enable_thinking = enableThinking;
+			orb.enable_thinking = enableThinking;
 
 			if (um?.thinking_budget !== undefined) {
-				rb.thinking_budget = um.thinking_budget;
+				orb.thinking_budget = um.thinking_budget;
 			}
 		}
 
 		// thinking (Zai provider)
 		if (um?.thinking?.type !== undefined) {
-			rb.thinking = {
+			orb.thinking = {
 				type: um.thinking.type,
 			};
 		}
@@ -206,7 +207,7 @@ export class OpenaiApi extends CommonApi {
 				if (reasoningConfig.exclude !== undefined) {
 					reasoningObj.exclude = reasoningConfig.exclude;
 				}
-				rb.reasoning = reasoningObj;
+				orb.reasoning = reasoningObj;
 			}
 		}
 
@@ -214,34 +215,34 @@ export class OpenaiApi extends CommonApi {
 		if (options.modelOptions) {
 			const mo = options.modelOptions as Record<string, unknown>;
 			if (typeof mo.stop === "string" || Array.isArray(mo.stop)) {
-				rb.stop = mo.stop;
+				orb.stop = mo.stop;
 			}
 		}
 
 		// tools
 		const toolConfig = convertToolsToOpenAI(options);
 		if (toolConfig.tools) {
-			rb.tools = toolConfig.tools;
+			orb.tools = toolConfig.tools;
 		}
 		if (toolConfig.tool_choice) {
-			rb.tool_choice = toolConfig.tool_choice;
+			orb.tool_choice = toolConfig.tool_choice;
 		}
 
 		// Configure user-defined additional parameters
 		if (um?.top_k !== undefined) {
-			rb.top_k = um.top_k;
+			orb.top_k = um.top_k;
 		}
 		if (um?.min_p !== undefined) {
-			rb.min_p = um.min_p;
+			orb.min_p = um.min_p;
 		}
 		if (um?.frequency_penalty !== undefined) {
-			rb.frequency_penalty = um.frequency_penalty;
+			orb.frequency_penalty = um.frequency_penalty;
 		}
 		if (um?.presence_penalty !== undefined) {
-			rb.presence_penalty = um.presence_penalty;
+			orb.presence_penalty = um.presence_penalty;
 		}
 		if (um?.repetition_penalty !== undefined) {
-			rb.repetition_penalty = um.repetition_penalty;
+			orb.repetition_penalty = um.repetition_penalty;
 		}
 
 		// Process extra configuration parameters
@@ -249,12 +250,12 @@ export class OpenaiApi extends CommonApi {
 			// Add all extra parameters directly to the request body
 			for (const [key, value] of Object.entries(um.extra)) {
 				if (value !== undefined) {
-					rb[key] = value;
+					orb[key] = value;
 				}
 			}
 		}
 
-		return rb;
+		return orb;
 	}
 
 	/**

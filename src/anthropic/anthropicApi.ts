@@ -145,43 +145,44 @@ export class AnthropicApi extends CommonApi {
 	}
 
 	prepareRequestBody(
-		rb: AnthropicRequestBody,
+		rb: any,
 		um: HFModelItem | undefined,
 		options: ProvideLanguageModelChatResponseOptions
-	): AnthropicRequestBody {
+	): any {
+		const arb = rb as AnthropicRequestBody;
 		// Set max_tokens (required for Anthropic)
 		if (um?.max_tokens !== undefined) {
-			rb.max_tokens = um.max_tokens;
+			arb.max_tokens = um.max_tokens;
 		}
 
 		// Add system content if we extracted it
 		if (this._systemContent) {
-			rb.system = this._systemContent;
+			arb.system = this._systemContent;
 		}
 
 		// Add temperature
 		const oTemperature = options.modelOptions?.temperature ?? 0;
 		const temperature = um?.temperature ?? oTemperature;
-		rb.temperature = temperature;
+		arb.temperature = temperature;
 		if (um && um.temperature === null) {
-			delete rb.temperature;
+			delete arb.temperature;
 		}
 
 		// Add top_p if configured
 		if (um?.top_p !== undefined && um.top_p !== null) {
-			rb.top_p = um.top_p;
+			arb.top_p = um.top_p;
 		}
 
 		// Add top_k if configured
 		if (um?.top_k !== undefined) {
-			rb.top_k = um.top_k;
+			arb.top_k = um.top_k;
 		}
 
 		// Add tools configuration
 		const toolConfig = convertToolsToOpenAI(options);
 		if (toolConfig.tools) {
 			// Convert OpenAI tool definitions to Anthropic format
-			rb.tools = toolConfig.tools.map((tool) => ({
+			arb.tools = toolConfig.tools.map((tool) => ({
 				name: tool.function.name,
 				description: tool.function.description,
 				input_schema: tool.function.parameters,
@@ -191,9 +192,9 @@ export class AnthropicApi extends CommonApi {
 		// Add tool_choice
 		if (toolConfig.tool_choice) {
 			if (toolConfig.tool_choice === "auto") {
-				rb.tool_choice = { type: "auto" };
+				arb.tool_choice = { type: "auto" };
 			} else if (typeof toolConfig.tool_choice === "object" && toolConfig.tool_choice.type === "function") {
-				rb.tool_choice = { type: "tool", name: toolConfig.tool_choice.function.name };
+				arb.tool_choice = { type: "tool", name: toolConfig.tool_choice.function.name };
 			}
 		}
 
@@ -202,12 +203,12 @@ export class AnthropicApi extends CommonApi {
 			// Add all extra parameters directly to the request body
 			for (const [key, value] of Object.entries(um.extra)) {
 				if (value !== undefined) {
-					(rb as unknown as Record<string, unknown>)[key] = value;
+					(arb as unknown as Record<string, unknown>)[key] = value;
 				}
 			}
 		}
 
-		return rb;
+		return arb;
 	}
 
 	/**

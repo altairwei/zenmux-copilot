@@ -10,6 +10,7 @@ import {
 
 import type { OpenAIChatMessage } from "./openai/openaiTypes";
 import type { AnthropicMessage, AnthropicRequestBody } from "./anthropic/anthropicTypes";
+import type { VertexContent, VertexRequestBody } from "./vertex/vertexTypes";
 import { HFModelItem } from "./types";
 import { tryParseJSONObject } from "./utils";
 
@@ -53,7 +54,7 @@ export abstract class CommonApi {
 	abstract convertMessages(
 		messages: readonly LanguageModelChatRequestMessage[],
 		modelConfig: { includeReasoningInRequest: boolean }
-	): Array<OpenAIChatMessage | AnthropicMessage>;
+	): Array<OpenAIChatMessage | AnthropicMessage | VertexContent>;
 
 	/**
 	 * Construct request body for Specific api
@@ -62,10 +63,10 @@ export abstract class CommonApi {
 	 * @param options From VS Code
 	 */
 	abstract prepareRequestBody(
-		rb: Record<string, unknown> | AnthropicRequestBody,
+		rb: any,
 		um: HFModelItem | undefined,
 		options: ProvideLanguageModelChatResponseOptions
-	): Record<string, unknown> | AnthropicRequestBody;
+	): any;
 
 	/**
 	 * Process specific api streaming response (JSON lines format).

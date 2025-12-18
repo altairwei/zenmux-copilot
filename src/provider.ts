@@ -12,6 +12,8 @@ import {
 import { createRetryConfig, ensureApiKey, executeWithRetry, fetchModels } from "./utils";
 import { AnthropicApi } from "./anthropic/anthropicApi";
 import { AnthropicRequestBody } from "./anthropic/anthropicTypes";
+import { VertexApi } from "./vertex/vertexApi";
+import { VertexRequestBody } from "./vertex/vertexTypes";
 import { prepareTokenCount } from "./provideToken";
 import { updateContextStatusBar } from "./statusBar";
 import { OpenaiApi } from "./openai/openaiApi";
@@ -75,7 +77,13 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
   }
 
   private isSupportMessage(model: vscode.LanguageModelChatInformation): boolean {
-    return model.family?.includes('messages') || false;
+    const family = model.family?.toLowerCase() || "";
+    return family.includes('messages');
+  }
+
+  private isSupportGeneration(model: vscode.LanguageModelChatInformation): boolean {
+    const family = model.family?.toLowerCase() || "";
+    return family.includes('generate');
   }
 
   private isSupportReasoning(model: vscode.LanguageModelChatInformation): boolean {
@@ -88,12 +96,13 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
     options: ProvideLanguageModelChatResponseOptions,
     progress: Progress<vscode.LanguageModelResponsePart>,
     token: CancellationToken) {
+    try { this.output.appendLine(`Starting provideLanguageModelChatResponse ${model.family}`); } catch { } // for debug breakpoint
     // Update Token Usage
     updateContextStatusBar(messages, model, this.statusBarItem);
 
     // Apply delay between consecutive requests
     const config = vscode.workspace.getConfiguration();
-    const delayMs = config.get<number>("oaicopilot.delay", 0);
+    const delayMs = config.get<number>("zenmux.delay", 0);
 
     if (delayMs > 0 && this._lastRequestTime !== null) {
       const elapsed = Date.now() - this._lastRequestTime;
@@ -127,7 +136,52 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
       }
       // get model config from user settings
       const config = vscode.workspace.getConfiguration();
-      if (this.isSupportMessage(model)) {
+      if (this.isSupportGeneration(model)) {
+        const BASE_URL = config.get<string>("zenmux.vertex.baseUrl", "https://zenmux.ai/api/vertex-ai");
+        // Vertex/Gemini API mode
+        const vertexApi = new VertexApi();
+        const vertexMessages = vertexApi.convertMessages(messages, {
+          includeReasoningInRequest: this.isSupportReasoning(model),
+        });
+
+        // requestBody
+        let requestBody: VertexRequestBody = {
+          contents: vertexMessages,
+        };
+        requestBody = vertexApi.prepareRequestBody(requestBody, {
+          id: model.id,
+          max_tokens: model.maxOutputTokens,
+        } as any, options);
+
+        // send Vertex chat request with retry
+        const response = await executeWithRetry(async () => {
+          const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/v1beta/models/${model.id}:streamGenerateContent?alt=sse`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent": this.userAgent,
+              "Authorization": `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          if (!res.ok) {
+            const errorText = await res.text();
+            const msg = `[Vertex Provider] Vertex API error response status=${res.status} statusText=${res.statusText} body=${errorText}`;
+            try { this.output.appendLine(msg); } catch { console.error(msg); }
+            throw new Error(
+              `Vertex API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+            );
+          }
+
+          return res;
+        }, createRetryConfig());
+
+        if (!response.body) {
+          throw new Error("No response body from Vertex API");
+        }
+        await vertexApi.processStreamingResponse(response.body, trackingProgress, token);
+      } else if (this.isSupportMessage(model)) {
         const BASE_URL = config.get<string>("zenmux.anthropic.baseUrl", "https://zenmux.ai/api/anthropic");
         // Anthropic API mode
         const anthropicApi = new AnthropicApi();
@@ -142,8 +196,10 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
           stream: true,
           max_tokens: model.maxOutputTokens || DEFAULT_MAX_TOKENS,
         };
-        // requestBody = anthropicApi.prepareRequestBody(requestBody, model, options);
-        // console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
+        requestBody = anthropicApi.prepareRequestBody(requestBody, {
+          id: model.id,
+          max_tokens: model.maxOutputTokens,
+        } as any, options);
 
         // send Anthropic chat request with retry
         const response = await executeWithRetry(async () => {
@@ -189,7 +245,10 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
           stream: true,
           stream_options: { include_usage: true },
         };
-        // requestBody = openaiApi.prepareRequestBody(requestBody, model, options);
+        requestBody = openaiApi.prepareRequestBody(requestBody, {
+          id: model.id,
+          max_tokens: model.maxOutputTokens,
+        } as any, options);
         // console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
 
         // send chat request with retry
@@ -206,9 +265,10 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
 
           if (!res.ok) {
             const errorText = await res.text();
-            console.error("[OAI Compatible Model Provider] OAI Compatible API error response", errorText);
+            const msg = `[ZenMux Provider] ZenMux API error response status=${res.status} statusText=${res.statusText} body=${errorText}`;
+            try { this.output.appendLine(msg); } catch { console.error(msg); }
             throw new Error(
-              `OAI Compatible API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+              `[ZenMux Provider] ZenMux API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
             );
           }
 
@@ -216,7 +276,9 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
         }, createRetryConfig());
 
         if (!response.body) {
-          throw new Error("No response body from OAI Compatible API");
+          const msg = "[ZenMux Provider] No response body from ZenMux API";
+          try { this.output.appendLine(msg); } catch { console.error(msg); }
+          throw new Error("No response body from ZenMux API");
         }
         await openaiApi.processStreamingResponse(response.body, trackingProgress, token);
       }
