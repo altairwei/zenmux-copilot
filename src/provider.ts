@@ -59,10 +59,10 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
       const maxInput = Math.max(1, m.context_length - m.max_completion_tokens || DEFAULT_MAX_TOKENS);
       return {
         id: `${m.slug}`,
-        name: m.name + ' via ZenMux',
+        name: m.name,
         tooltip: 'ZenMux Model ' + (m.name || ''),
-        detail: m.suitable_api + '-' + m.supports_reasoning,
-        family: 'zenmux',
+        detail: 'ZenMux',
+        family: m.suitable_api + '-' + m.supports_reasoning,
         version: m.publish_time || '1.0.0',
         maxInputTokens: maxInput,
         maxOutputTokens: m.max_completion_tokens || DEFAULT_MAX_TOKENS,
@@ -75,11 +75,11 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
   }
 
   private isSupportMessage(model: vscode.LanguageModelChatInformation): boolean {
-    return model.detail?.includes('messages') || false;
+    return model.family?.includes('messages') || false;
   }
 
   private isSupportReasoning(model: vscode.LanguageModelChatInformation): boolean {
-    return model.detail?.endsWith('-1') || false;
+    return model.family?.endsWith('-1') || false;
   }
 
   async provideLanguageModelChatResponse(
