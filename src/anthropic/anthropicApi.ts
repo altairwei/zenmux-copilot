@@ -141,7 +141,41 @@ export class AnthropicApi extends CommonApi {
 			}
 		}
 
-		return out;
+		// 为关键消息添加缓存控制
+		// Anthropic 的缓存策略：在长上下文的末尾标记缓存点
+		const messagesWithCache = out.map((msg, index) => {
+			if (Array.isArray(msg.content) && msg.content.length > 0) {
+				const contentBlocks = [...msg.content];
+
+				// 策略1：缓存前几条用户消息（通常包含重要上下文）
+				const shouldCacheEarlyUserMessage = msg.role === "user" && index < 2;
+
+				// 策略2：缓存包含大量文本内容的消息（如代码上下文）
+				const totalTextLength = contentBlocks
+					.filter(block => block.type === "text")
+					.reduce((sum, block) => sum + ((block as any).text?.length || 0), 0);
+				const shouldCacheLongContent = totalTextLength > 1024;
+
+				// 在最后一个 content block 添加缓存标记
+				if (shouldCacheEarlyUserMessage || shouldCacheLongContent) {
+					const lastBlock = contentBlocks[contentBlocks.length - 1];
+					// 只在支持缓存的 block 类型上添加
+					if (
+						lastBlock.type === "text" ||
+						lastBlock.type === "image" ||
+						lastBlock.type === "tool_use" ||
+						lastBlock.type === "tool_result"
+					) {
+						(lastBlock as any).cache_control = { type: "ephemeral" };
+					}
+				}
+
+				return { ...msg, content: contentBlocks };
+			}
+			return msg;
+		});
+
+		return messagesWithCache;
 	}
 
 	prepareRequestBody(
@@ -155,9 +189,16 @@ export class AnthropicApi extends CommonApi {
 			arb.max_tokens = um.max_tokens;
 		}
 
-		// Add system content if we extracted it
+		// Add system content if we extracted it with cache control
 		if (this._systemContent) {
-			arb.system = this._systemContent;
+			// 使用结构化 system 格式以支持缓存
+			arb.system = [
+				{
+					type: "text",
+					text: this._systemContent,
+					cache_control: { type: "ephemeral" }, // System 消息总是缓存
+				},
+			];
 		}
 
 		// Add temperature
@@ -258,7 +299,7 @@ export class AnthropicApi extends CommonApi {
 
 					try {
 						const chunk: AnthropicStreamChunk = JSON.parse(data);
-						// console.debug("[OAI Compatible Model Provider] data:", JSON.stringify(chunk));
+						// console.debug("[ZenMux Model Provider] data:", JSON.stringify(chunk));
 
 						await this.processAnthropicChunk(chunk, progress);
 					} catch (e) {

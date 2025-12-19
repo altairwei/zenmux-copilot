@@ -29,6 +29,14 @@ export interface OpenAIChatMessage {
 	tool_calls?: OpenAIToolCall[];
 	tool_call_id?: string;
 	reasoning_content?: string;
+	cache_control?: CacheControl; // 支持缓存控制
+}
+
+/**
+ * 缓存控制配置（Anthropic Prompt Caching）
+ */
+export interface CacheControl {
+	type: "ephemeral"; // ephemeral 类型表示临时缓存
 }
 
 /**

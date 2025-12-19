@@ -37,7 +37,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 			if (!apiKey.trim()) {
 				await context.secrets.delete("zenmux.apiKey");
-				vscode.window.showInformationMessage("OAI Compatible API key cleared.");
+				vscode.window.showInformationMessage("ZenMux API key cleared.");
 				return;
 			}
 			await context.secrets.store("zenmux.apiKey", apiKey.trim());

@@ -5,9 +5,14 @@
 
 export type AnthropicRole = "user" | "assistant";
 
+export interface CacheControl {
+	type: "ephemeral";
+}
+
 export interface AnthropicTextBlock {
 	type: "text";
 	text: string;
+	cache_control?: CacheControl;
 }
 
 export interface AnthropicImageBlock {
@@ -17,6 +22,7 @@ export interface AnthropicImageBlock {
 		media_type: string;
 		data: string;
 	};
+	cache_control?: CacheControl;
 }
 
 export interface AnthropicThinkingBlock {
@@ -30,6 +36,7 @@ export interface AnthropicToolUseBlock {
 	id: string;
 	name: string;
 	input: Record<string, unknown>;
+	cache_control?: CacheControl;
 }
 
 export interface AnthropicToolResultBlock {
@@ -37,6 +44,7 @@ export interface AnthropicToolResultBlock {
 	tool_use_id: string;
 	content: string | AnthropicTextBlock[];
 	is_error?: boolean;
+	cache_control?: CacheControl;
 }
 
 export type AnthropicContentBlock =
@@ -51,11 +59,17 @@ export interface AnthropicMessage {
 	content: string | AnthropicContentBlock[];
 }
 
+export interface SystemBlock {
+	type: "text";
+	text: string;
+	cache_control?: CacheControl;
+}
+
 export interface AnthropicRequestBody {
 	model: string;
 	messages: AnthropicMessage[];
 	max_tokens?: number;
-	system?: string | AnthropicTextBlock[];
+	system?: string | SystemBlock[];
 	stream?: boolean;
 	temperature?: number;
 	top_p?: number;

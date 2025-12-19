@@ -31,7 +31,7 @@ export async function ensureApiKey(silent: boolean, secrets: vscode.SecretStorag
  * Fetch the list of models and supplementary metadata from Hugging Face.
  * @param apiKey The HF API key used to authenticate.
  */
-export async function fetchModels(apiKey: string, userAgent: string): Promise<{ models: ZenMuxModelInfo[] }> {
+export async function fetchModels(apiKey: string, userAgent: string, output: vscode.OutputChannel): Promise<{ models: ZenMuxModelInfo[] }> {
 	const config = vscode.workspace.getConfiguration();
 	const BASE_URL = config.get<string>("zenmux.baseUrl", "");
 	if (!BASE_URL || !BASE_URL.startsWith("http")) {
@@ -46,13 +46,19 @@ export async function fetchModels(apiKey: string, userAgent: string): Promise<{ 
 			let text = "";
 			try {
 				text = await resp.text();
-			} catch (error) {
-				console.error("[OAI Compatible Model Provider] Failed to read response text", error);
+			} catch (error: any) {
+				if (error instanceof Error) {
+					output.appendLine(`Error reading response text: ${error.message}`);
+					error.stack && output.appendLine(error.stack);
+				} else {
+					output.appendLine(`Unknown error reading response text: ${String(error)}`);
+				}
+				console.error("[ZenMux Model Provider] Failed to read response text", error);
 			}
 			const err = new Error(
-				`Failed to fetch OAI Compatible models: ${resp.status} ${resp.statusText}${text ? `\n${text}` : ""}`
+				`Failed to fetch ZenMux models: ${resp.status} ${resp.statusText}${text ? `\n${text}` : ""}`
 			);
-			console.error("[OAI Compatible Model Provider] Failed to fetch OAI Compatible models", err);
+			console.error("[ZenMux Model Provider] Failed to fetch ZenMux models", err);
 			throw err;
 		}
 		const parsed = (await resp.json()) as ZenMuxModelResponse;
@@ -63,7 +69,13 @@ export async function fetchModels(apiKey: string, userAgent: string): Promise<{ 
 		const models = await modelsList;
 		return { models };
 	} catch (err) {
-		console.error("[OAI Compatible Model Provider] Failed to fetch OAI Compatible models", err);
+		if (err instanceof Error) {
+			output.appendLine(`Failed to fetch ZenMux models: ${err.message}`);
+			err.stack && output.appendLine(err.stack);
+		} else {
+			output.appendLine(`Failed to fetch ZenMux models: ${String(err)}`);
+		}
+		console.error("[ZenMux Model Provider] Failed to fetch ZenMux models", err);
 		throw err;
 	}
 }
@@ -165,7 +177,7 @@ export function convertToolsToOpenAI(options: vscode.ProvideLanguageModelChatRes
 	let tool_choice: "auto" | { type: "function"; function: { name: string } } = "auto";
 	if (options.toolMode === vscode.LanguageModelChatToolMode.Required) {
 		if (tools.length !== 1) {
-			console.error("[OAI Compatible Model Provider] ToolMode.Required but multiple tools:", tools.length);
+			console.error("[ZenMux Model Provider] ToolMode.Required but multiple tools:", tools.length);
 			throw new Error("LanguageModelChatToolMode.Required is not supported with more than one tool");
 		}
 		tool_choice = { type: "function", function: { name: tools[0].name } };

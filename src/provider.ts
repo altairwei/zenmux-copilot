@@ -56,7 +56,8 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
         throw new Error("ZenMux API key not found");
       }
     }
-    const { models } = await fetchModels(apiKey, this.userAgent);
+    const { models } = await fetchModels(apiKey, this.userAgent, this.output);
+    this.output.appendLine(`Fetched ${models.length} models from ZenMux API.`);
     return models.map(m => {
       const maxInput = Math.max(1, m.context_length - m.max_completion_tokens || DEFAULT_MAX_TOKENS);
       return {
@@ -249,7 +250,7 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
           id: model.id,
           max_tokens: model.maxOutputTokens,
         } as any, options);
-        // console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
+        // console.debug("[ZenMux Model Provider] RequestBody:", JSON.stringify(requestBody));
 
         // send chat request with retry
         const response = await executeWithRetry(async () => {

@@ -137,7 +137,30 @@ export class OpenaiApi extends CommonApi {
 				}
 			}
 		}
-		return out;
+
+		// 为支持缓存的消息添加缓存控制
+		// 缓存策略：标记 system 消息和长文本消息用于缓存
+		const messagesWithCache = out.map((v, index) => {
+			const message = { ...v };
+
+			// 判断是否应该启用缓存
+			// 1. System 消息通常适合缓存（包含系统提示）
+			// 2. 长文本用户消息（如代码上下文）
+			// 3. 在消息序列中的关键位置（如第一个 system 消息）
+			const shouldCache =
+				(v.role === "system") || // System 消息
+				(v.role === "user" && index < 3) || // 前几条用户消息（上下文）
+				(typeof v.content === "string" && v.content.length > 1000); // 长文本
+
+			if (shouldCache) {
+				// Anthropic 格式的缓存控制
+				message.cache_control = { type: "ephemeral" };
+			}
+
+			return message;
+		});
+
+		return messagesWithCache;
 	}
 
 	prepareRequestBody(
@@ -301,7 +324,7 @@ export class OpenaiApi extends CommonApi {
 
 					try {
 						const parsed = JSON.parse(data);
-						// console.debug("[OAI Compatible Model Provider] data:", JSON.stringify(parsed));
+						// console.debug("[ZenMux Model Provider] data:", JSON.stringify(parsed));
 
 						await this.processDelta(parsed, progress);
 					} catch {
@@ -387,7 +410,7 @@ export class OpenaiApi extends CommonApi {
 				}
 			}
 		} catch (e) {
-			console.error("[OAI Compatible Model Provider] Failed to process thinking/reasoning_details:", e);
+			console.error("[ZenMux Model Provider] Failed to process thinking/reasoning_details:", e);
 		}
 
 		if (deltaObj?.content) {
