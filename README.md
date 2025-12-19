@@ -1,87 +1,97 @@
-# ZenMux Compatible Provider for Copilot
+# 🚀 ZenMux Provider for Copilot
 
-This extension provides a language model provider for GitHub Copilot Chat that connects to ZenMux. ZenMux is a model gateway that unifies inference APIs from different backends (for example OpenAI, Anthropic, Vertex AI) under a single, compatible API surface. For more information, visit the official ZenMux website: https://zenmux.ai
+Welcome to **ZenMux Provider for Copilot**! This is a model provider extension designed specifically for VS Code Copilot. With this extension, you can seamlessly integrate the powerful model gateway capabilities of [ZenMux](https://zenmux.ai) into VS Code Copilot, giving you the freedom to use top-tier AI models.
 
-## Key points
+## 💡 Usage
 
-- ZenMux is a model gateway used to route and manage requests to multiple backend inference providers.
-- This extension exposes a `ZenMux Provider` to Copilot Chat so Copilot can send requests via a configured ZenMux instance.
+Just a few simple steps to start your ZenMux journey:
 
-## Overview
+1.  📥 **Install Extension**: Click [here](https://marketplace.visualstudio.com/items?itemName=hugehardzhang.zenmux-copilot) to install the extension.
+2.  💬 **Open Copilot**: Open the GitHub Copilot Chat interface in VS Code.
+3.  ⚙️ **Manage Models**: Click the model picker below the chat input box and select "Manage Models...".
+4.  ✅ **Select ZenMux**: Click "Add Models" and then select the "ZenMux" provider.
+5.  🔑 **Configure Key**: Enter your ZenMux API Key (the key will be securely saved locally).
+6.  🎯 **Pick Models**: Select the specific models you wish to use in the model picker.
 
-- Name: ZenMux Compatible Provider for Copilot
-- Version: see `package.json`
+## ℹ️ Extension Information
 
-## Prerequisites
+- **Name**: ZenMux Provider for Copilot
+- **Version**: See `package.json`
 
-- VS Code >= 1.104.0
-- The `github.copilot-chat` extension installed
-- Node.js (for development and building)
+## ✅ Prerequisites
 
-## Install & build
+Before you begin, please ensure you meet the following requirements:
 
-Install dependencies (if needed):
+- 💻 **VS Code Version**: >= 1.104.0
+- 🧩 **Copilot Extension**: `github.copilot-chat` extension installed
+- 🔑 **API Key**: A valid ZenMux API Key (get it from [zenmux.ai](https://zenmux.ai))
+- 🟢 **Node.js**: (Required only for development and building)
+
+## 🛠️ Installation & Build (Development Guide)
+
+If you are a developer and want to build or modify this project yourself:
+
+**1. Install Dependencies**
 
 ```powershell
 npm install
 ```
 
-Compile TypeScript:
+**2. Compile TypeScript**
 
 ```powershell
 npm run compile
 ```
 
-Package a VSIX (optional):
+**3. Package VSIX (Optional)**
 
 ```powershell
 npm run build
 ```
 
-## Run in the Extension Development Host
+## 🐛 Run in Extension Development Host
 
-- Open this repository in VS Code and press F5 (Run Extension) to launch an Extension Development Host.
-- After activation in the development host, Copilot Chat should list and be able to use the `ZenMux Provider` language model provider.
+1.  Open this repository in VS Code.
+2.  Press `F5` to launch the **Extension Development Host**.
+3.  In the development host, open Copilot Chat; you should be able to see and use the `ZenMux Provider`.
 
-## Activation & logging
+## 📝 Activation & Logging
 
-- Activation events are declared in `package.json` under `activationEvents` (for example `onStartupFinished` and `onCommand:zenmux.setApikey`).
-- The extension creates an Output Channel named `ZenMux`. To view logs:
-  - Open the Output panel (View → Output or Ctrl+Shift+U).
-  - Select `ZenMux` from the dropdown in the panel's top-right.
+- **Activation Events**: The extension activates when events declared in `package.json` are triggered (e.g., `onStartupFinished` or when running a command).
+- **View Logs**:
+    1.  Open the Output Panel (View → Output or `Ctrl+Shift+U`).
+    2.  Select the `ZenMux` channel from the dropdown menu in the top right corner.
 
-## Configuration (common)
+## ⚙️ Configuration (Common)
 
-- `zenmux.baseUrl`: base URL for the ZenMux gateway (example default: `https://zenmux.ai/api/v1`).
+You can adjust the following parameters in VS Code Settings:
+
+- `zenmux.baseUrl`: Base URL for the ZenMux gateway (Default: `https://zenmux.ai/api/v1`).
 - `zenmux.anthropic.baseUrl`: Anthropic-compatible backend URL.
-- `zenmux.retry`: request retry policy (enable, max attempts, interval_ms).
-- `zenmux.delay`: fixed delay between requests in milliseconds.
+- `zenmux.retry`: Request retry policy (enabled, max attempts, interval in ms).
+- `zenmux.delay`: Fixed delay between requests (in milliseconds).
 
-## Commands
+## ⌨️ Commands
 
-- `zenmux.setApikey` — Run from the Command Palette (Ctrl+Shift+P) to set or update the API key used to authenticate with ZenMux.
+- `zenmux.setApikey`: Run this command via the Command Palette (`Ctrl+Shift+P`) to set or update your ZenMux API Key at any time.
 
-## Debugging tips
+## 🔍 Debugging Tips
 
-- If the extension does not activate or shows no logs:
-  - Make sure you are viewing the Extension Development Host (start with F5) and check the host's Output panel for `ZenMux`.
-  - Open Developer Tools in the host (Help → Toggle Developer Tools) to inspect console errors.
-  - Reload the window (`Developer: Reload Window`) and re-check Output → ZenMux.
-  - Confirm you ran `npm run compile` and that `out/extension.js` exists for VS Code to load.
+If the extension does not activate or shows no logs:
 
-## Contributing & issues
+- 🧐 Ensure you are viewing the **Extension Development Host** window.
+- 📄 Check the `ZenMux` channel in the **Output Panel**.
+- 🐞 Open **Developer Tools** (Help → Toggle Developer Tools) to check for console errors.
+- 🔄 Try **Reload Window** (`Developer: Reload Window`).
+- 📁 Confirm that the `out/extension.js` file exists (ensure you have run `npm run compile`).
 
-- File issues at: https://github.com/ilimei/zenmux-copilot/issues
-- Contributions welcome via fork and pull request.
+## 🤝 Contributing & Feedback
 
-## License
+We welcome your participation!
 
-- MIT
+- 🐛 **Submit Issues**: [GitHub Issues](https://github.com/ilimei/zenmux-copilot/issues)
+- 🔀 **Contribute Code**: Feel free to Fork this repository and submit a Pull Request.
 
-## Next steps
+## 📄 License
 
-If you'd like, I can also:
-
-- Add example configuration and request snippets for ZenMux backends.
-- Add CI instructions to build & publish a VSIX to the Marketplace.
-- Provide an additional README section with quick API examples.
+[MIT License](LICENSE)
