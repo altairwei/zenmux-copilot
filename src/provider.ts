@@ -87,6 +87,11 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
     return family.includes('generate');
   }
 
+  private isSupportChat(model: vscode.LanguageModelChatInformation): boolean {
+    const family = model.family?.toLowerCase() || "";
+    return family.includes('chat.completions');
+  }
+
   private isSupportReasoning(model: vscode.LanguageModelChatInformation): boolean {
     return model.family?.endsWith('-1') || false;
   }
@@ -137,52 +142,7 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
       }
       // get model config from user settings
       const config = vscode.workspace.getConfiguration();
-      if (this.isSupportGeneration(model)) {
-        const BASE_URL = config.get<string>("zenmux.vertex.baseUrl", "https://zenmux.ai/api/vertex-ai");
-        // Vertex/Gemini API mode
-        const vertexApi = new VertexApi();
-        const vertexMessages = vertexApi.convertMessages(messages, {
-          includeReasoningInRequest: this.isSupportReasoning(model),
-        });
-
-        // requestBody
-        let requestBody: VertexRequestBody = {
-          contents: vertexMessages,
-        };
-        requestBody = vertexApi.prepareRequestBody(requestBody, {
-          id: model.id,
-          max_tokens: model.maxOutputTokens,
-        } as any, options);
-
-        // send Vertex chat request with retry
-        const response = await executeWithRetry(async () => {
-          const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/v1beta/models/${model.id}:streamGenerateContent?alt=sse`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "User-Agent": this.userAgent,
-              "Authorization": `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify(requestBody),
-          });
-
-          if (!res.ok) {
-            const errorText = await res.text();
-            const msg = `[Vertex Provider] Vertex API error response status=${res.status} statusText=${res.statusText} body=${errorText}`;
-            try { this.output.appendLine(msg); } catch { console.error(msg); }
-            throw new Error(
-              `Vertex API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
-            );
-          }
-
-          return res;
-        }, createRetryConfig());
-
-        if (!response.body) {
-          throw new Error("No response body from Vertex API");
-        }
-        await vertexApi.processStreamingResponse(response.body, trackingProgress, token);
-      } else if (this.isSupportMessage(model)) {
+      if (this.isSupportMessage(model)) {
         const BASE_URL = config.get<string>("zenmux.anthropic.baseUrl", "https://zenmux.ai/api/anthropic");
         // Anthropic API mode
         const anthropicApi = new AnthropicApi();

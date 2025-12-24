@@ -52,6 +52,9 @@ export class VertexApi extends CommonApi {
 
 			for (const part of m.content ?? []) {
 				if (part instanceof vscode.LanguageModelTextPart) {
+					if (part.value.trim().length === 0) {
+						continue;
+					}
 					textParts.push(part.value);
 				} else if (part instanceof vscode.LanguageModelDataPart && isImageMimeType(part.mimeType)) {
 					imageParts.push(part);
@@ -141,6 +144,8 @@ export class VertexApi extends CommonApi {
 				});
 			}
 		}
+
+		console.info(out);
 
 		return out;
 	}
