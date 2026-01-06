@@ -139,20 +139,44 @@ export class OpenaiApi extends CommonApi {
 		}
 
 		// 为支持缓存的消息添加缓存控制
-		// 缓存策略：标记 system 消息和长文本消息用于缓存
+		// 缓存策略：标记 system 消息和长文本消息用于缓存。最多支持 4 个缓存点。
+
+		// 1. 识别所有潜在的缓存候选消息
+		const cacheCandidates: number[] = [];
+		for (let i = 0; i < out.length; i++) {
+			const msg = out[i];
+
+			// 策略1：System 消息
+			const isSystem = msg.role === "system";
+
+			// 策略2：前几条用户消息（上下文）
+			const isEarlyUser = msg.role === "user" && i < 3;
+
+			// 策略3：长文本
+			let textLen = 0;
+			if (typeof msg.content === "string") {
+				textLen = msg.content.length;
+			} else if (Array.isArray(msg.content)) {
+				textLen = msg.content
+					.filter((c: any) => c.type === "text")
+					.reduce((acc: number, c: any) => acc + (c.text?.length || 0), 0);
+			}
+			const isLong = textLen > 1000;
+
+			if (isSystem || isEarlyUser || isLong) {
+				cacheCandidates.push(i);
+			}
+		}
+
+		// 2. 确定可用配额并选择缓存点
+		const maxMessagesWithCache = 4;
+		// 优先保留最后的缓存点以最大化前缀复用
+		const indicesToCache = new Set(cacheCandidates.slice(-maxMessagesWithCache));
+
 		const messagesWithCache = out.map((v, index) => {
 			const message = { ...v };
 
-			// 判断是否应该启用缓存
-			// 1. System 消息通常适合缓存（包含系统提示）
-			// 2. 长文本用户消息（如代码上下文）
-			// 3. 在消息序列中的关键位置（如第一个 system 消息）
-			const shouldCache =
-				(v.role === "system") || // System 消息
-				(v.role === "user" && index < 3) || // 前几条用户消息（上下文）
-				(typeof v.content === "string" && v.content.length > 1000); // 长文本
-
-			if (shouldCache) {
+			if (indicesToCache.has(index)) {
 				// Anthropic 格式的缓存控制
 				message.cache_control = { type: "ephemeral" };
 			}

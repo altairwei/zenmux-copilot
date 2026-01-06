@@ -145,32 +145,61 @@ export class AnthropicApi extends CommonApi {
 		}
 
 		// 为关键消息添加缓存控制
-		// Anthropic 的缓存策略：在长上下文的末尾标记缓存点
+		// Anthropic 的缓存策略：在长上下文的末尾标记缓存点。最多支持 4 个缓存点。
+
+		// 1. 识别所有潜在的缓存候选消息
+		const cacheCandidates: number[] = [];
+		for (let i = 0; i < out.length; i++) {
+			const msg = out[i];
+			if (!Array.isArray(msg.content) || msg.content.length === 0) {
+				continue;
+			}
+
+			// 策略1：缓存前几条用户消息（通常包含重要上下文）
+			const shouldCacheEarlyUserMessage = msg.role === "user" && i < 2;
+
+			// 策略2：缓存包含大量文本内容的消息（如代码上下文）
+			const totalTextLength = msg.content
+				.filter(block => block.type === "text")
+				.reduce((sum, block) => sum + ((block as any).text?.length || 0), 0);
+			const shouldCacheLongContent = totalTextLength > 1024;
+
+			if (shouldCacheEarlyUserMessage || shouldCacheLongContent) {
+				cacheCandidates.push(i);
+			}
+		}
+
+		// 2. 确定可用配额并选择缓存点
+		// System 消息如果在 prepareRequestBody 中被使用了，会占用 1 个配额
+		const systemTakesCache = !!this._systemContent;
+		const maxMessagesWithCache = systemTakesCache ? 3 : 4;
+
+		// 优先保留最后的缓存点以最大化前缀复用
+		const indicesToCache = new Set(cacheCandidates.slice(-maxMessagesWithCache));
+
+		// 3. 应用缓存控制
 		const messagesWithCache = out.map((msg, index) => {
-			if (Array.isArray(msg.content) && msg.content.length > 0) {
+			if (indicesToCache.has(index) && Array.isArray(msg.content) && msg.content.length > 0) {
 				const contentBlocks = [...msg.content];
-
-				// 策略1：缓存前几条用户消息（通常包含重要上下文）
-				const shouldCacheEarlyUserMessage = msg.role === "user" && index < 2;
-
-				// 策略2：缓存包含大量文本内容的消息（如代码上下文）
-				const totalTextLength = contentBlocks
-					.filter(block => block.type === "text")
-					.reduce((sum, block) => sum + ((block as any).text?.length || 0), 0);
-				const shouldCacheLongContent = totalTextLength > 1024;
-
-				// 在最后一个 content block 添加缓存标记
-				if (shouldCacheEarlyUserMessage || shouldCacheLongContent) {
-					const lastBlock = contentBlocks[contentBlocks.length - 1];
-					// 只在支持缓存的 block 类型上添加
+				// 尝试在最后一个支持缓存的 block 上添加标记
+				// 注意：Thinking block 目前可能不支持，所以要找到最后一个支持的类型
+				let targetBlockIndex = -1;
+				for (let i = contentBlocks.length - 1; i >= 0; i--) {
+					const block = contentBlocks[i];
 					if (
-						lastBlock.type === "text" ||
-						lastBlock.type === "image" ||
-						lastBlock.type === "tool_use" ||
-						lastBlock.type === "tool_result"
+						block.type === "text" ||
+						block.type === "image" ||
+						block.type === "tool_use" ||
+						block.type === "tool_result"
 					) {
-						(lastBlock as any).cache_control = { type: "ephemeral" };
+						targetBlockIndex = i;
+						break;
 					}
+				}
+
+				if (targetBlockIndex !== -1) {
+					const targetBlock = contentBlocks[targetBlockIndex];
+					(targetBlock as any).cache_control = { type: "ephemeral" };
 				}
 
 				return { ...msg, content: contentBlocks };
