@@ -11,7 +11,7 @@ import {
 import type { OpenAIChatMessage } from "./openai/openaiTypes";
 import type { AnthropicMessage, AnthropicRequestBody } from "./anthropic/anthropicTypes";
 import type { VertexContent, VertexRequestBody } from "./vertex/vertexTypes";
-import { HFModelItem } from "./types";
+import { HFModelItem, ZenMuxModelInfo } from "./types";
 import { tryParseJSONObject } from "./utils";
 
 export abstract class CommonApi {
@@ -64,7 +64,7 @@ export abstract class CommonApi {
 	 */
 	abstract prepareRequestBody(
 		rb: any,
-		um: HFModelItem | undefined,
+		um: ZenMuxModelInfo | undefined,
 		options: ProvideLanguageModelChatResponseOptions
 	): any;
 

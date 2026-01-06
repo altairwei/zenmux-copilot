@@ -17,6 +17,7 @@ import { VertexRequestBody } from "./vertex/vertexTypes";
 import { prepareTokenCount } from "./provideToken";
 import { updateContextStatusBar } from "./statusBar";
 import { OpenaiApi } from "./openai/openaiApi";
+import { ZenMuxModelInfo } from "./types";
 
 
 const DEFAULT_CONTEXT_LENGTH = 128000;
@@ -28,6 +29,8 @@ const DEFAULT_MAX_TOKENS = 4096;
 export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
   /** Track last request completion time for delay calculation. */
   private _lastRequestTime: number | null = null;
+
+  private _models: ZenMuxModelInfo[] = [];
 
   /**
  * Create a provider using the given secret storage for the API key.
@@ -57,6 +60,7 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
       }
     }
     const { models } = await fetchModels(apiKey, this.userAgent, this.output);
+    this._models = models;
     this.output.appendLine(`Fetched ${models.length} models from ZenMux API.`);
     return models.map(m => {
       const maxInput = Math.max(1, m.context_length - m.max_completion_tokens || DEFAULT_MAX_TOKENS);
@@ -82,6 +86,11 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
     return family.includes('messages');
   }
 
+  private isSupportResponse(model: vscode.LanguageModelChatInformation): boolean {
+    const family = model.family?.toLowerCase() || "";
+    return family.includes('responses');
+  }
+
   private isSupportGeneration(model: vscode.LanguageModelChatInformation): boolean {
     const family = model.family?.toLowerCase() || "";
     return family.includes('generate');
@@ -102,7 +111,9 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
     options: ProvideLanguageModelChatResponseOptions,
     progress: Progress<vscode.LanguageModelResponsePart>,
     token: CancellationToken) {
+    const zenMuxModel = this._models.find(m => m.slug === model.id);
     try { this.output.appendLine(`Starting provideLanguageModelChatResponse ${model.family}`); } catch { } // for debug breakpoint
+    try { this.output.appendLine(`Starting provideLanguageModelChatResponse ${zenMuxModel?.supported_parameters}`); } catch { } // for debug breakpoint
     // Update Token Usage
     updateContextStatusBar(messages, model, this.statusBarItem);
 
@@ -148,6 +159,7 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
         const anthropicApi = new AnthropicApi();
         const anthropicMessages = anthropicApi.convertMessages(messages, {
           includeReasoningInRequest: false,
+          supportParameters: zenMuxModel?.supported_parameters || "",
         });
 
         // requestBody
@@ -206,10 +218,7 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
           stream: true,
           stream_options: { include_usage: true },
         };
-        requestBody = openaiApi.prepareRequestBody(requestBody, {
-          id: model.id,
-          max_tokens: model.maxOutputTokens,
-        } as any, options);
+        requestBody = openaiApi.prepareRequestBody(requestBody, zenMuxModel, options);
         // console.debug("[ZenMux Model Provider] RequestBody:", JSON.stringify(requestBody));
 
         // send chat request with retry

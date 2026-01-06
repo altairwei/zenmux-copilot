@@ -7,7 +7,7 @@ import {
 	Progress,
 } from "vscode";
 
-import type { HFModelItem, ReasoningConfig } from "../types";
+import type { HFModelItem, ReasoningConfig, ZenMuxModelInfo } from "../types";
 
 import type {
 	OpenAIChatMessage,
@@ -42,7 +42,7 @@ export class OpenaiApi extends CommonApi {
 	 */
 	convertMessages(
 		messages: readonly LanguageModelChatRequestMessage[],
-		modelConfig: { includeReasoningInRequest: boolean }
+		modelConfig: { includeReasoningInRequest: boolean; }
 	): OpenAIChatMessage[] {
 		const out: OpenAIChatMessage[] = [];
 		for (const m of messages) {
@@ -189,74 +189,74 @@ export class OpenaiApi extends CommonApi {
 
 	prepareRequestBody(
 		rb: any,
-		um: HFModelItem | undefined,
-		options: ProvideLanguageModelChatResponseOptions
+		um: ZenMuxModelInfo | undefined,
+		options: ProvideLanguageModelChatResponseOptions,
 	): any {
 		const orb = rb as Record<string, unknown>;
-		// temperature
-		const oTemperature = options.modelOptions?.temperature ?? 0;
-		const temperature = um?.temperature ?? oTemperature;
-		orb.temperature = temperature;
-		if (um && um.temperature === null) {
-			delete orb.temperature;
-		}
+		// // temperature
+		// const oTemperature = options.modelOptions?.temperature ?? 0;
+		// const temperature = um?.temperature ?? oTemperature;
+		// orb.temperature = temperature;
+		// if (um && um.temperature === null) {
+		// 	delete orb.temperature;
+		// }
 
-		// top_p
-		if (um?.top_p !== undefined && um.top_p !== null) {
-			orb.top_p = um.top_p;
-		}
+		// // top_p
+		// if (um?.top_p !== undefined && um.top_p !== null) {
+		// 	orb.top_p = um.top_p;
+		// }
 
-		// max_tokens
-		if (um?.max_tokens !== undefined) {
-			orb.max_tokens = um.max_tokens;
-		}
+		// // max_tokens
+		// if (um?.max_tokens !== undefined) {
+		// 	orb.max_tokens = um.max_tokens;
+		// }
 
-		// max_completion_tokens (OpenAI new standard parameter)
-		if (um?.max_completion_tokens !== undefined) {
-			orb.max_completion_tokens = um.max_completion_tokens;
-		}
+		// // max_completion_tokens (OpenAI new standard parameter)
+		// if (um?.max_completion_tokens !== undefined) {
+		// 	orb.max_completion_tokens = um.max_completion_tokens;
+		// }
 
-		// OpenAI reasoning configuration
-		if (um?.reasoning_effort !== undefined) {
-			orb.reasoning_effort = um.reasoning_effort;
-		}
+		// // OpenAI reasoning configuration
+		// if (um?.reasoning_effort !== undefined) {
+		// 	orb.reasoning_effort = um.reasoning_effort;
+		// }
 
-		// enable_thinking (non-OpenRouter only)
-		const enableThinking = um?.enable_thinking;
-		if (enableThinking !== undefined) {
-			orb.enable_thinking = enableThinking;
+		// // enable_thinking (non-OpenRouter only)
+		// const enableThinking = um?.enable_thinking;
+		// if (enableThinking !== undefined) {
+		// 	orb.enable_thinking = enableThinking;
 
-			if (um?.thinking_budget !== undefined) {
-				orb.thinking_budget = um.thinking_budget;
-			}
-		}
+		// 	if (um?.thinking_budget !== undefined) {
+		// 		orb.thinking_budget = um.thinking_budget;
+		// 	}
+		// }
 
-		// thinking (Zai provider)
-		if (um?.thinking?.type !== undefined) {
-			orb.thinking = {
-				type: um.thinking.type,
-			};
-		}
+		// // thinking (Zai provider)
+		// if (um?.thinking?.type !== undefined) {
+		// 	orb.thinking = {
+		// 		type: um.thinking.type,
+		// 	};
+		// }
 
 		// OpenRouter reasoning configuration
-		if (um?.reasoning !== undefined) {
-			const reasoningConfig: ReasoningConfig = um.reasoning as ReasoningConfig;
-			if (reasoningConfig.enabled !== false) {
-				const reasoningObj: Record<string, unknown> = {};
-				const effort = reasoningConfig.effort;
-				const maxTokensReasoning = reasoningConfig.max_tokens || 2000; // Default 2000 as per docs
-				if (effort && effort !== "auto") {
-					reasoningObj.effort = effort;
-				} else {
-					// If auto or unspecified, use max_tokens (Anthropic-style fallback)
-					reasoningObj.max_tokens = maxTokensReasoning;
-				}
-				if (reasoningConfig.exclude !== undefined) {
-					reasoningObj.exclude = reasoningConfig.exclude;
-				}
-				orb.reasoning = reasoningObj;
-			}
-		}
+		// if (um?.reasoning !== undefined) {
+		// 	const reasoningConfig: ReasoningConfig = um.reasoning as ReasoningConfig;
+		// 	if (reasoningConfig.enabled !== false) {
+		// 		const reasoningObj: Record<string, unknown> = {};
+		// 		const effort = reasoningConfig.effort;
+		// 		const maxTokensReasoning = reasoningConfig.max_tokens || 2000; // Default 2000 as per docs
+		// 		if (effort && effort !== "auto") {
+		// 			reasoningObj.effort = effort;
+		// 		} else {
+		// 			// If auto or unspecified, use max_tokens (Anthropic-style fallback)
+		// 			reasoningObj.max_tokens = maxTokensReasoning;
+		// 		}
+		// 		if (reasoningConfig.exclude !== undefined) {
+		// 			reasoningObj.exclude = reasoningConfig.exclude;
+		// 		}
+		// 		orb.reasoning = reasoningObj;
+		// 	}
+		// }
 
 		// stop
 		if (options.modelOptions) {
@@ -275,32 +275,32 @@ export class OpenaiApi extends CommonApi {
 			orb.tool_choice = toolConfig.tool_choice;
 		}
 
-		// Configure user-defined additional parameters
-		if (um?.top_k !== undefined) {
-			orb.top_k = um.top_k;
-		}
-		if (um?.min_p !== undefined) {
-			orb.min_p = um.min_p;
-		}
-		if (um?.frequency_penalty !== undefined) {
-			orb.frequency_penalty = um.frequency_penalty;
-		}
-		if (um?.presence_penalty !== undefined) {
-			orb.presence_penalty = um.presence_penalty;
-		}
-		if (um?.repetition_penalty !== undefined) {
-			orb.repetition_penalty = um.repetition_penalty;
-		}
+		// // Configure user-defined additional parameters
+		// if (um?.top_k !== undefined) {
+		// 	orb.top_k = um.top_k;
+		// }
+		// if (um?.min_p !== undefined) {
+		// 	orb.min_p = um.min_p;
+		// }
+		// if (um?.frequency_penalty !== undefined) {
+		// 	orb.frequency_penalty = um.frequency_penalty;
+		// }
+		// if (um?.presence_penalty !== undefined) {
+		// 	orb.presence_penalty = um.presence_penalty;
+		// }
+		// if (um?.repetition_penalty !== undefined) {
+		// 	orb.repetition_penalty = um.repetition_penalty;
+		// }
 
 		// Process extra configuration parameters
-		if (um?.extra && typeof um.extra === "object") {
-			// Add all extra parameters directly to the request body
-			for (const [key, value] of Object.entries(um.extra)) {
-				if (value !== undefined) {
-					orb[key] = value;
-				}
-			}
-		}
+		// if (um?.extra && typeof um.extra === "object") {
+		// 	// Add all extra parameters directly to the request body
+		// 	for (const [key, value] of Object.entries(um.extra)) {
+		// 		if (value !== undefined) {
+		// 			orb[key] = value;
+		// 		}
+		// 	}
+		// }
 
 		return orb;
 	}

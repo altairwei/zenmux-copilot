@@ -7,7 +7,7 @@ import {
 	Progress,
 } from "vscode";
 
-import type { HFModelItem } from "../types";
+import type { HFModelItem, ZenMuxModelInfo } from "../types";
 
 import type {
 	AnthropicMessage,
@@ -37,7 +37,7 @@ export class AnthropicApi extends CommonApi {
 	 */
 	convertMessages(
 		messages: readonly LanguageModelChatRequestMessage[],
-		modelConfig: { includeReasoningInRequest: boolean }
+		modelConfig: { includeReasoningInRequest: boolean; supportParameters: string; }
 	): AnthropicMessage[] {
 		const out: AnthropicMessage[] = [];
 
@@ -212,14 +212,14 @@ export class AnthropicApi extends CommonApi {
 
 	prepareRequestBody(
 		rb: any,
-		um: HFModelItem | undefined,
+		um: ZenMuxModelInfo | undefined,
 		options: ProvideLanguageModelChatResponseOptions
 	): any {
 		const arb = rb as AnthropicRequestBody;
 		// Set max_tokens (required for Anthropic)
-		if (um?.max_tokens !== undefined) {
-			arb.max_tokens = um.max_tokens;
-		}
+		// if (um?.max_tokens !== undefined) {
+		// 	arb.max_tokens = um.max_tokens;
+		// }
 
 		// Add system content if we extracted it with cache control
 		if (this._systemContent) {
@@ -234,22 +234,22 @@ export class AnthropicApi extends CommonApi {
 		}
 
 		// Add temperature
-		const oTemperature = options.modelOptions?.temperature ?? 0;
-		const temperature = um?.temperature ?? oTemperature;
-		arb.temperature = temperature;
-		if (um && um.temperature === null) {
-			delete arb.temperature;
-		}
+		// const oTemperature = options.modelOptions?.temperature ?? 0;
+		// const temperature = um?.temperature ?? oTemperature;
+		// arb.temperature = temperature;
+		// if (um && um.temperature === null) {
+		// 	delete arb.temperature;
+		// }
 
-		// Add top_p if configured
-		if (um?.top_p !== undefined && um.top_p !== null) {
-			arb.top_p = um.top_p;
-		}
+		// // Add top_p if configured
+		// if (um?.top_p !== undefined && um.top_p !== null) {
+		// 	arb.top_p = um.top_p;
+		// }
 
-		// Add top_k if configured
-		if (um?.top_k !== undefined) {
-			arb.top_k = um.top_k;
-		}
+		// // Add top_k if configured
+		// if (um?.top_k !== undefined) {
+		// 	arb.top_k = um.top_k;
+		// }
 
 		// Add tools configuration
 		const toolConfig = convertToolsToOpenAI(options);
@@ -272,14 +272,14 @@ export class AnthropicApi extends CommonApi {
 		}
 
 		// Process extra configuration parameters
-		if (um?.extra && typeof um.extra === "object") {
-			// Add all extra parameters directly to the request body
-			for (const [key, value] of Object.entries(um.extra)) {
-				if (value !== undefined) {
-					(arb as unknown as Record<string, unknown>)[key] = value;
-				}
-			}
-		}
+		// if (um?.extra && typeof um.extra === "object") {
+		// 	// Add all extra parameters directly to the request body
+		// 	for (const [key, value] of Object.entries(um.extra)) {
+		// 		if (value !== undefined) {
+		// 			(arb as unknown as Record<string, unknown>)[key] = value;
+		// 		}
+		// 	}
+		// }
 
 		return arb;
 	}

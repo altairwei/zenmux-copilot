@@ -7,7 +7,7 @@ import {
 	Progress,
 } from "vscode";
 
-import type { HFModelItem } from "../types";
+import type { HFModelItem, ZenMuxModelInfo } from "../types";
 
 import type {
 	VertexRequestBody,
@@ -152,7 +152,7 @@ export class VertexApi extends CommonApi {
 
 	prepareRequestBody(
 		rb: any,
-		um: HFModelItem | undefined,
+		um: ZenMuxModelInfo | undefined,
 		options: ProvideLanguageModelChatResponseOptions
 	): any {
 		const vrb = rb as VertexRequestBody;
@@ -162,9 +162,9 @@ export class VertexApi extends CommonApi {
 		}
 
 		// Set maxOutputTokens
-		if (um?.max_tokens !== undefined) {
-			vrb.generationConfig.maxOutputTokens = um.max_tokens;
-		}
+		// if (um?.max_tokens !== undefined) {
+		// 	vrb.generationConfig.maxOutputTokens = um.max_tokens;
+		// }
 
 		// Add system instruction if we extracted it
 		if (this._systemContent) {
@@ -174,22 +174,22 @@ export class VertexApi extends CommonApi {
 		}
 
 		// Add temperature
-		const oTemperature = options.modelOptions?.temperature ?? 0;
-		const temperature = um?.temperature ?? oTemperature;
-		vrb.generationConfig.temperature = temperature;
-		if (um && um.temperature === null) {
-			delete vrb.generationConfig.temperature;
-		}
+		// const oTemperature = options.modelOptions?.temperature ?? 0;
+		// const temperature = um?.temperature ?? oTemperature;
+		// vrb.generationConfig.temperature = temperature;
+		// if (um && um.temperature === null) {
+		// 	delete vrb.generationConfig.temperature;
+		// }
 
 		// Add topP if configured
-		if (um?.top_p !== undefined && um.top_p !== null) {
-			vrb.generationConfig.topP = um.top_p;
-		}
+		// if (um?.top_p !== undefined && um.top_p !== null) {
+		// 	vrb.generationConfig.topP = um.top_p;
+		// }
 
 		// Add topK if configured
-		if (um?.top_k !== undefined) {
-			vrb.generationConfig.topK = um.top_k;
-		}
+		// if (um?.top_k !== undefined) {
+		// 	vrb.generationConfig.topK = um.top_k;
+		// }
 
 		// Add tools configuration
 		const toolConfig = convertToolsToOpenAI(options);
@@ -225,14 +225,14 @@ export class VertexApi extends CommonApi {
 		}
 
 		// Process extra configuration parameters
-		if (um?.extra && typeof um.extra === "object") {
-			// Add all extra parameters directly to the request body
-			for (const [key, value] of Object.entries(um.extra)) {
-				if (value !== undefined) {
-					(vrb as unknown as Record<string, unknown>)[key] = value;
-				}
-			}
-		}
+		// if (um?.extra && typeof um.extra === "object") {
+		// 	// Add all extra parameters directly to the request body
+		// 	for (const [key, value] of Object.entries(um.extra)) {
+		// 		if (value !== undefined) {
+		// 			(vrb as unknown as Record<string, unknown>)[key] = value;
+		// 		}
+		// 	}
+		// }
 
 		return vrb;
 	}
