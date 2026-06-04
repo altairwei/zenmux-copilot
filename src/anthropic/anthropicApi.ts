@@ -153,39 +153,14 @@ export class AnthropicApi extends CommonApi {
 
 		const sanitized = this.sanitizeToolUsePairs(out, modelConfig.includeReasoningInRequest);
 
-		// 为关键消息添加缓存控制
-		// Anthropic 的缓存策略：在长上下文的末尾标记缓存点。最多支持 4 个缓存点。
-
-		// 1. 识别所有潜在的缓存候选消息
-		const cacheCandidates: number[] = [];
-		for (let i = 0; i < sanitized.length; i++) {
-			const msg = sanitized[i];
-			if (!Array.isArray(msg.content) || msg.content.length === 0) {
-				continue;
-			}
-
-			// 策略1：缓存前几条用户消息（通常包含重要上下文）
-			const shouldCacheEarlyUserMessage = msg.role === "user" && i < 2;
-
-			// 策略2：缓存包含大量文本内容的消息（如代码上下文）
-			const totalTextLength = msg.content
-				.filter(block => block.type === "text")
-				.reduce((sum, block) => sum + ((block as any).text?.length || 0), 0);
-			const shouldCacheLongContent = totalTextLength > 1024;
-
-			if (shouldCacheEarlyUserMessage || shouldCacheLongContent) {
-				cacheCandidates.push(i);
-			}
-		}
-
-		// 2. 确定可用配额并选择缓存点
-		// System 消息如果在 prepareRequestBody 中被使用了，会占用 1 个配额
+		// 为关键消息添加缓存控制。Anthropic 最多支持 4 个缓存断点：
+		// 1. 优先给上下文消息打断点；2. 始终给最后一条消息打断点；3. 剩余配额给长文本。
 		const usePromptCache = supportsParameter(modelConfig.supportParameters, "cache_control");
 		const systemTakesCache = usePromptCache && !!this._systemContent;
 		const maxMessagesWithCache = systemTakesCache ? 3 : 4;
-
-		// 优先保留最后的缓存点以最大化前缀复用
-		const indicesToCache = new Set(cacheCandidates.slice(-maxMessagesWithCache));
+		const indicesToCache = usePromptCache
+			? this.selectCacheBreakpoints(sanitized, maxMessagesWithCache)
+			: new Set<number>();
 
 		// 3. 应用缓存控制
 		const messagesWithCache = sanitized.map((msg, index) => {
@@ -218,6 +193,79 @@ export class AnthropicApi extends CommonApi {
 		});
 
 		return messagesWithCache;
+	}
+
+	private selectCacheBreakpoints(messages: AnthropicMessage[], maxCount: number): Set<number> {
+		if (maxCount <= 0) {
+			return new Set();
+		}
+
+		const eligible = messages
+			.map((msg, index) => ({ msg, index }))
+			.filter(({ msg }) => Array.isArray(msg.content) && this.findCacheableBlockIndex(msg.content) !== -1);
+		const lastEligible = eligible[eligible.length - 1]?.index;
+		const selected: number[] = [];
+		const selectedSet = new Set<number>();
+
+		const add = (index: number | undefined) => {
+			if (index === undefined || selectedSet.has(index) || selected.length >= maxCount) {
+				return;
+			}
+			selected.push(index);
+			selectedSet.add(index);
+		};
+
+		// Copilot usually sends reusable workspace/file context near the front.
+		const contextIndex =
+			eligible.find(({ msg, index }) => index !== lastEligible && msg.role === "user")?.index ??
+			eligible.find(({ index }) => index !== lastEligible)?.index;
+		add(contextIndex);
+
+		const reservedForLast = lastEligible !== undefined && !selectedSet.has(lastEligible) ? 1 : 0;
+		const longContextCandidates = eligible
+			.filter(({ index }) => index !== contextIndex && index !== lastEligible)
+			.map(({ msg, index }) => ({ index, textLength: this.getMessageTextLength(msg) }))
+			.filter(({ textLength }) => textLength > 1024)
+			.sort((a, b) => b.index - a.index);
+
+		for (const candidate of longContextCandidates) {
+			if (selected.length >= maxCount - reservedForLast) {
+				break;
+			}
+			add(candidate.index);
+		}
+
+		// Always cache the final eligible message so the next turn can reuse the full prefix.
+		add(lastEligible);
+
+		return selectedSet;
+	}
+
+	private findCacheableBlockIndex(content: string | AnthropicContentBlock[]): number {
+		if (!Array.isArray(content)) {
+			return -1;
+		}
+		for (let i = content.length - 1; i >= 0; i--) {
+			const block = content[i];
+			if (
+				block.type === "text" ||
+				block.type === "image" ||
+				block.type === "tool_use" ||
+				block.type === "tool_result"
+			) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private getMessageTextLength(message: AnthropicMessage): number {
+		if (typeof message.content === "string") {
+			return message.content.length;
+		}
+		return message.content
+			.filter((block) => block.type === "text")
+			.reduce((sum, block) => sum + ("text" in block ? block.text.length : 0), 0);
 	}
 
 	/**
