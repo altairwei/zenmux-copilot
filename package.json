@@ -47,7 +47,11 @@
 	],
 	"activationEvents": [
 		"onStartupFinished",
-		"onCommand:zenmux.setApikey"
+		"onCommand:zenmux.setApikey",
+		"onCommand:zenmux.showSubscriptionUsage",
+		"onCommand:zenmux.setManagementApiKey",
+		"onCommand:zenmux.clearManagementApiKey",
+		"onCommand:zenmux.refreshSubscriptionUsage"
 	],
 	"contributes": {
 		"languageModelChatProviders": [
@@ -61,6 +65,22 @@
 			{
 				"command": "zenmux.setApikey",
 				"title": "ZenMux: Set ZenMux Apikey"
+			},
+			{
+				"command": "zenmux.showSubscriptionUsage",
+				"title": "ZenMux: Show Subscription Usage"
+			},
+			{
+				"command": "zenmux.setManagementApiKey",
+				"title": "ZenMux: Set Management API Key"
+			},
+			{
+				"command": "zenmux.clearManagementApiKey",
+				"title": "ZenMux: Clear Management API Key"
+			},
+			{
+				"command": "zenmux.refreshSubscriptionUsage",
+				"title": "ZenMux: Refresh Subscription Usage"
 			}
 		],
 		"configuration": {

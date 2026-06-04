@@ -40,7 +40,8 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
     private readonly secrets: vscode.SecretStorage,
     private readonly userAgent: string,
     private readonly statusBarItem: vscode.StatusBarItem,
-    private readonly output: vscode.OutputChannel
+    private readonly output: vscode.OutputChannel,
+    private readonly onRequestComplete?: () => void | Promise<void>
   ) { }
 
   /**
@@ -271,6 +272,13 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
     } finally {
       // Update last request time after successful completion
       this._lastRequestTime = Date.now();
+      Promise.resolve(this.onRequestComplete?.()).catch((error) => {
+        try {
+          this.output.appendLine(`[ZenMux Model Provider] Request completion hook failed: ${error instanceof Error ? error.message : String(error)}`);
+        } catch {
+          console.error("[ZenMux Model Provider] Request completion hook failed", error);
+        }
+      });
     }
   }
 

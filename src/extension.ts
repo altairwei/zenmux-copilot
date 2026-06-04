@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { ZenMuxChatModelProvider } from "./provider";
 import { initStatusBar } from "./statusBar";
+import { SubscriptionStatusBar } from "./subscriptionStatusBar";
 
 export function activate(context: vscode.ExtensionContext) {
 	// Build a descriptive User-Agent to help quantify API usage
@@ -15,7 +16,18 @@ export function activate(context: vscode.ExtensionContext) {
 	const output = vscode.window.createOutputChannel("ZenMux");
 	context.subscriptions.push(output);
 
-	const provider = new ZenMuxChatModelProvider(context.secrets, ua, tokenCountStatusBarItem, output);
+	const subscriptionStatusBar = new SubscriptionStatusBar(context, ua, output);
+	subscriptionStatusBar.initialize().catch((error) => {
+		output.appendLine(`[ZenMux Subscription] Failed to initialize: ${error instanceof Error ? error.message : String(error)}`);
+	});
+
+	const provider = new ZenMuxChatModelProvider(
+		context.secrets,
+		ua,
+		tokenCountStatusBarItem,
+		output,
+		() => subscriptionStatusBar.refreshAfterChatRequest()
+	);
 	// Register the ZenMux provider under the vendor id used in package.json
 	vscode.lm.registerLanguageModelChatProvider("zenmux", provider);
 
@@ -42,6 +54,21 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 			await context.secrets.store("zenmux.apiKey", apiKey.trim());
 			vscode.window.showInformationMessage("ZenMux API key saved.");
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand("zenmux.showSubscriptionUsage", async () => {
+			await subscriptionStatusBar.showMenu();
+		}),
+		vscode.commands.registerCommand("zenmux.setManagementApiKey", async () => {
+			await subscriptionStatusBar.setManagementApiKey();
+		}),
+		vscode.commands.registerCommand("zenmux.clearManagementApiKey", async () => {
+			await subscriptionStatusBar.clearManagementApiKey();
+		}),
+		vscode.commands.registerCommand("zenmux.refreshSubscriptionUsage", async () => {
+			await subscriptionStatusBar.refresh({ force: true, silent: false });
 		})
 	);
 }
