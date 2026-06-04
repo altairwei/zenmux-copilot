@@ -24,6 +24,7 @@ import {
 	isToolResultPart,
 	collectToolResultText,
 	convertToolsToOpenAI,
+	supportsParameter,
 	mapRole,
 } from "../utils";
 
@@ -42,7 +43,7 @@ export class OpenaiApi extends CommonApi {
 	 */
 	convertMessages(
 		messages: readonly LanguageModelChatRequestMessage[],
-		modelConfig: { includeReasoningInRequest: boolean; }
+		modelConfig: { includeReasoningInRequest: boolean; supportParameters?: string; }
 	): OpenAIChatMessage[] {
 		const out: OpenAIChatMessage[] = [];
 		for (const m of messages) {
@@ -172,6 +173,10 @@ export class OpenaiApi extends CommonApi {
 		const maxMessagesWithCache = 4;
 		// 优先保留最后的缓存点以最大化前缀复用
 		const indicesToCache = new Set(cacheCandidates.slice(-maxMessagesWithCache));
+
+		if (!supportsParameter(modelConfig.supportParameters, "cache_control")) {
+			return out;
+		}
 
 		const messagesWithCache = out.map((v, index) => {
 			const message = { ...v };

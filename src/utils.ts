@@ -187,6 +187,16 @@ export function convertToolsToOpenAI(options: vscode.ProvideLanguageModelChatRes
 }
 
 /**
+ * Check whether a comma-separated model capability list includes a parameter.
+ */
+export function supportsParameter(supportedParameters: string | undefined, parameter: string): boolean {
+	return (supportedParameters ?? "")
+		.split(",")
+		.map((value) => value.trim().toLowerCase())
+		.includes(parameter.toLowerCase());
+}
+
+/**
  * Map VS Code message role to OpenAI message role string.
  * @param message The message whose role is mapped.
  */
@@ -217,7 +227,7 @@ export function createDataUrl(dataPart: vscode.LanguageModelDataPart): string {
  */
 export function createRetryConfig(): RetryConfig {
 	const config = vscode.workspace.getConfiguration();
-	const retryConfig = config.get<RetryConfig>("oaicopilot.retry", {
+	const retryConfig = config.get<RetryConfig>("zenmux.retry", {
 		enabled: true,
 		max_attempts: RETRY_MAX_ATTEMPTS,
 		interval_ms: RETRY_INTERVAL_MS,

@@ -18,7 +18,7 @@ import type {
 	AnthropicStreamChunk,
 } from "./anthropicTypes";
 
-import { isImageMimeType, isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole } from "../utils";
+import { isImageMimeType, isToolResultPart, collectToolResultText, convertToolsToOpenAI, supportsParameter, mapRole } from "../utils";
 
 import { CommonApi } from "../commonApi";
 
@@ -47,7 +47,7 @@ export class AnthropicApi extends CommonApi {
 			const imageParts: vscode.LanguageModelDataPart[] = [];
 			const toolCalls: AnthropicToolUseBlock[] = [];
 			const toolResults: AnthropicToolResultBlock[] = [];
-			const thinkingParts: string[] = [];
+			const thinkingParts: { thinking: string; signature?: string }[] = [];
 
 			for (const part of m.content ?? []) {
 				if (part instanceof vscode.LanguageModelTextPart) {
@@ -75,7 +75,11 @@ export class AnthropicApi extends CommonApi {
 					});
 				} else if (part instanceof vscode.LanguageModelThinkingPart) {
 					const content = Array.isArray(part.value) ? part.value.join("") : part.value;
-					thinkingParts.push(content);
+					const metadata = (part as { metadata?: { signature?: unknown } }).metadata;
+					thinkingParts.push({
+						thinking: content,
+						signature: typeof metadata?.signature === "string" ? metadata.signature : undefined,
+					});
 				}
 			}
 
@@ -113,9 +117,12 @@ export class AnthropicApi extends CommonApi {
 
 			// Add thinking content for assistant messages
 			if (role === "assistant" && thinkingParts.length > 0 && modelConfig.includeReasoningInRequest) {
+				const thinking = thinkingParts.map((part) => part.thinking).join("\n");
+				const signature = [...thinkingParts].reverse().find((part) => part.signature)?.signature;
 				contentBlocks.push({
 					type: "thinking",
-					thinking: thinkingParts.join("\n"),
+					thinking,
+					...(signature ? { signature } : {}),
 				});
 			}
 
@@ -144,13 +151,15 @@ export class AnthropicApi extends CommonApi {
 			}
 		}
 
+		const sanitized = this.sanitizeToolUsePairs(out, modelConfig.includeReasoningInRequest);
+
 		// 为关键消息添加缓存控制
 		// Anthropic 的缓存策略：在长上下文的末尾标记缓存点。最多支持 4 个缓存点。
 
 		// 1. 识别所有潜在的缓存候选消息
 		const cacheCandidates: number[] = [];
-		for (let i = 0; i < out.length; i++) {
-			const msg = out[i];
+		for (let i = 0; i < sanitized.length; i++) {
+			const msg = sanitized[i];
 			if (!Array.isArray(msg.content) || msg.content.length === 0) {
 				continue;
 			}
@@ -171,15 +180,16 @@ export class AnthropicApi extends CommonApi {
 
 		// 2. 确定可用配额并选择缓存点
 		// System 消息如果在 prepareRequestBody 中被使用了，会占用 1 个配额
-		const systemTakesCache = !!this._systemContent;
+		const usePromptCache = supportsParameter(modelConfig.supportParameters, "cache_control");
+		const systemTakesCache = usePromptCache && !!this._systemContent;
 		const maxMessagesWithCache = systemTakesCache ? 3 : 4;
 
 		// 优先保留最后的缓存点以最大化前缀复用
 		const indicesToCache = new Set(cacheCandidates.slice(-maxMessagesWithCache));
 
 		// 3. 应用缓存控制
-		const messagesWithCache = out.map((msg, index) => {
-			if (indicesToCache.has(index) && Array.isArray(msg.content) && msg.content.length > 0) {
+		const messagesWithCache = sanitized.map((msg, index) => {
+			if (usePromptCache && indicesToCache.has(index) && Array.isArray(msg.content) && msg.content.length > 0) {
 				const contentBlocks = [...msg.content];
 				// 尝试在最后一个支持缓存的 block 上添加标记
 				// 注意：Thinking block 目前可能不支持，所以要找到最后一个支持的类型
@@ -210,6 +220,79 @@ export class AnthropicApi extends CommonApi {
 		return messagesWithCache;
 	}
 
+	/**
+	 * Anthropic requires every assistant tool_use to be followed immediately by
+	 * a user message containing the matching tool_result. VS Code histories can
+	 * contain interrupted or pruned tool calls, so remove unmatched tool blocks
+	 * before sending the conversation upstream.
+	 */
+	private sanitizeToolUsePairs(messages: AnthropicMessage[], requireThinkingForToolUse: boolean): AnthropicMessage[] {
+		const sanitized: AnthropicMessage[] = [];
+
+		for (let i = 0; i < messages.length; i++) {
+			const current = messages[i];
+			const currentBlocks = Array.isArray(current.content) ? current.content : undefined;
+
+			if (current.role === "assistant" && currentBlocks) {
+				const toolUseIds = currentBlocks
+					.filter((block): block is AnthropicToolUseBlock => block.type === "tool_use")
+					.map((block) => block.id);
+
+				if (toolUseIds.length > 0) {
+					const hasThinking = currentBlocks.some((block) => block.type === "thinking");
+					if (requireThinkingForToolUse && !hasThinking) {
+						const filteredBlocks = currentBlocks.filter((block) => block.type !== "tool_use");
+						if (filteredBlocks.length > 0) {
+							sanitized.push({ ...current, content: filteredBlocks });
+						}
+						continue;
+					}
+
+					const next = messages[i + 1];
+					const nextBlocks = next && next.role === "user" && Array.isArray(next.content) ? next.content : [];
+					const resultIds = new Set(
+						nextBlocks
+							.filter((block): block is AnthropicToolResultBlock => block.type === "tool_result")
+							.map((block) => block.tool_use_id)
+					);
+					const matchedToolUseIds = new Set(toolUseIds.filter((id) => resultIds.has(id)));
+					const filteredBlocks = currentBlocks.filter(
+						(block) => block.type !== "tool_use" || matchedToolUseIds.has(block.id)
+					);
+
+					if (filteredBlocks.length > 0) {
+						sanitized.push({ ...current, content: filteredBlocks });
+					}
+					continue;
+				}
+			}
+
+			if (current.role === "user" && currentBlocks) {
+				const previous = sanitized[sanitized.length - 1];
+				const previousBlocks = previous && previous.role === "assistant" && Array.isArray(previous.content)
+					? previous.content
+					: [];
+				const previousToolUseIds = new Set(
+					previousBlocks
+						.filter((block): block is AnthropicToolUseBlock => block.type === "tool_use")
+						.map((block) => block.id)
+				);
+				const filteredBlocks = currentBlocks.filter(
+					(block) => block.type !== "tool_result" || previousToolUseIds.has(block.tool_use_id)
+				);
+
+				if (filteredBlocks.length > 0) {
+					sanitized.push({ ...current, content: filteredBlocks });
+				}
+				continue;
+			}
+
+			sanitized.push(current);
+		}
+
+		return sanitized;
+	}
+
 	prepareRequestBody(
 		rb: any,
 		um: ZenMuxModelInfo | undefined,
@@ -223,14 +306,18 @@ export class AnthropicApi extends CommonApi {
 
 		// Add system content if we extracted it with cache control
 		if (this._systemContent) {
-			// 使用结构化 system 格式以支持缓存
-			arb.system = [
-				{
-					type: "text",
-					text: this._systemContent,
-					cache_control: { type: "ephemeral" }, // System 消息总是缓存
-				},
-			];
+			if (supportsParameter(um?.supported_parameters, "cache_control")) {
+				// 使用结构化 system 格式以支持缓存
+				arb.system = [
+					{
+						type: "text",
+						text: this._systemContent,
+						cache_control: { type: "ephemeral" }, // System 消息总是缓存
+					},
+				];
+			} else {
+				arb.system = this._systemContent;
+			}
 		}
 
 		// Add temperature
@@ -426,8 +513,10 @@ export class AnthropicApi extends CommonApi {
 					await this.tryEmitBufferedToolCall(idx, progress);
 				}
 			} else if (chunk.delta.type === "signature_delta" && chunk.delta.signature) {
-				// Signature for thinking block - ignore for now
-				// Could store for verification if needed later
+				const thinkingId = this._currentThinkingId;
+				if (thinkingId) {
+					progress.report(new vscode.LanguageModelThinkingPart("", thinkingId, { signature: chunk.delta.signature }));
+				}
 			}
 		} else if (chunk.type === "content_block_stop" || chunk.type === "message_stop") {
 			// End of message - ensure thinking is ended and flush all tool calls

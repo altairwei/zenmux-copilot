@@ -60,9 +60,10 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
       }
     }
     const { models } = await fetchModels(apiKey, this.userAgent, this.output);
-    this._models = models;
-    this.output.appendLine(`Fetched ${models.length} models from ZenMux API.`);
-    return models.map(m => {
+    const chatModels = models.filter((m) => this.isSupportedChatModel(m.suitable_api));
+    this._models = chatModels;
+    this.output.appendLine(`Fetched ${models.length} models from ZenMux API, exposing ${chatModels.length} chat-capable models.`);
+    return chatModels.map(m => {
       const maxInput = Math.max(1, m.context_length - m.max_completion_tokens || DEFAULT_MAX_TOKENS);
       return {
         id: `${m.slug}`,
@@ -83,7 +84,12 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
 
   private isSupportMessage(model: vscode.LanguageModelChatInformation): boolean {
     const family = model.family?.toLowerCase() || "";
-    return family.includes('messages');
+    return family.split("-")[0].split(",").map((api) => api.trim()).includes("messages");
+  }
+
+  private isSupportedChatModel(suitableApi: string | undefined): boolean {
+    const api = suitableApi?.toLowerCase() || "";
+    return api.includes('chat.completions') || api.includes('messages');
   }
 
   private isSupportResponse(model: vscode.LanguageModelChatInformation): boolean {
@@ -102,7 +108,9 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
   }
 
   private isSupportReasoning(model: vscode.LanguageModelChatInformation): boolean {
-    return model.family?.endsWith('-1') || false;
+    const family = model.family || "";
+    const match = family.match(/-(\d+)$/);
+    return match ? Number(match[1]) > 0 : false;
   }
 
   async provideLanguageModelChatResponse(
@@ -158,7 +166,7 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
         // Anthropic API mode
         const anthropicApi = new AnthropicApi();
         const anthropicMessages = anthropicApi.convertMessages(messages, {
-          includeReasoningInRequest: false,
+          includeReasoningInRequest: this.isSupportReasoning(model),
           supportParameters: zenMuxModel?.supported_parameters || "",
         });
 
@@ -209,6 +217,7 @@ export class ZenMuxChatModelProvider implements LanguageModelChatProvider {
         const openaiApi = new OpenaiApi();
         const openaiMessages = openaiApi.convertMessages(messages, {
           includeReasoningInRequest: false,
+          supportParameters: zenMuxModel?.supported_parameters || "",
         });
 
         // requestBody
