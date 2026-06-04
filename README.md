@@ -71,9 +71,24 @@ You can adjust the following parameters in VS Code Settings:
 - `zenmux.retry`: Request retry policy (enabled, max attempts, interval in ms).
 - `zenmux.delay`: Fixed delay between requests (in milliseconds).
 
+## 📊 Subscription Usage
+
+You can optionally configure a ZenMux Management API Key to show subscription usage in the VS Code status bar.
+
+- The Management API Key is stored securely in VS Code SecretStorage.
+- Standard ZenMux API Keys are not supported for subscription usage.
+- The status bar shows 5-hour and 7-day quota usage, and refreshes after chat requests with throttling.
+- Click the ZenMux subscription status bar item to refresh usage, update the Management API Key, clear the key, or open the API docs.
+
+Use `ZenMux: Set Management API Key` from the Command Palette to enable this feature.
+
 ## ⌨️ Commands
 
 - `zenmux.setApikey`: Run this command via the Command Palette (`Ctrl+Shift+P`) to set or update your ZenMux API Key at any time.
+- `zenmux.setManagementApiKey`: Set or update the ZenMux Management API Key for subscription usage.
+- `zenmux.refreshSubscriptionUsage`: Refresh subscription usage manually.
+- `zenmux.clearManagementApiKey`: Clear the stored Management API Key.
+- `zenmux.showSubscriptionUsage`: Open subscription usage actions.
 
 ## 🔍 Debugging Tips
 

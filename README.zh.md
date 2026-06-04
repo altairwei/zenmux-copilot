@@ -71,9 +71,24 @@ npm run build
 - `zenmux.retry`: 请求重试策略（是否启用、最大尝试次数、间隔毫秒数）。
 - `zenmux.delay`: 请求之间的固定延迟（毫秒）。
 
+## 📊 订阅用量
+
+您可以选择配置 ZenMux Management API Key，在 VS Code 状态栏中查看订阅用量。
+
+- Management API Key 会安全保存在 VS Code SecretStorage 中。
+- 普通 ZenMux API Key 不支持查询订阅用量。
+- 状态栏会展示 5 小时和 7 天配额用量，并在聊天请求后节流刷新。
+- 点击 ZenMux 订阅状态栏项，可以刷新用量、更新 Management API Key、清除密钥或打开 API 文档。
+
+可通过命令面板运行 `ZenMux: Set Management API Key` 来启用此功能。
+
 ## ⌨️ 命令
 
 - `zenmux.setApikey`: 通过命令面板 (`Ctrl+Shift+P`) 运行此命令，可随时设置或更新您的 ZenMux API Key。
+- `zenmux.setManagementApiKey`: 设置或更新用于订阅用量查询的 ZenMux Management API Key。
+- `zenmux.refreshSubscriptionUsage`: 手动刷新订阅用量。
+- `zenmux.clearManagementApiKey`: 清除已保存的 Management API Key。
+- `zenmux.showSubscriptionUsage`: 打开订阅用量操作菜单。
 
 ## 🔍 调试技巧
 
